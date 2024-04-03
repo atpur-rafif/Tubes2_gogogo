@@ -11,10 +11,10 @@ import (
 const API = "https://en.wikipedia.org/w/api.php"
 
 type WikipediaResponse struct {
-	Continue struct {
+	Continue *(struct {
 		Continue   string
 		Plcontinue string
-	} `json:"continue"`
+	}) `json:",omitempty"`
 	Query struct {
 		Pages map[string](struct {
 			Title string
@@ -30,33 +30,43 @@ func getLinks(page string) []string {
 	query.Add("action", "query")
 	query.Add("format", "json")
 	query.Add("prop", "links")
-	query.Add("pllimit", "max")
+	query.Add("pllimit", "50")
 	query.Add("titles", page)
 
-	url := fmt.Sprintf("%s?%s", API, query.Encode())
-	response, err := http.Get(url)
-	if err != nil {
-		panic(err)
-	}
-	defer response.Body.Close()
-	byte, err := io.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
+	for {
+		url := fmt.Sprintf("%s?%s", API, query.Encode())
+		response, err := http.Get(url)
+		if err != nil {
+			panic(err)
+		}
+		defer response.Body.Close()
+		byte, err := io.ReadAll(response.Body)
+		if err != nil {
+			panic(err)
+		}
 
-	var parsed WikipediaResponse
-	err = json.Unmarshal(byte, &parsed)
-	if err != nil {
-		fmt.Println(err)
-	}
+		var parsed WikipediaResponse
+		err = json.Unmarshal(byte, &parsed)
+		if err != nil {
+			fmt.Println(err)
+		}
 
-	fmt.Println(parsed)
-	fmt.Println(url)
+		fmt.Println(parsed)
+		fmt.Println(url)
+
+		if parsed.Continue == nil {
+			break
+		} else {
+			query.Set("plcontinue", parsed.Continue.Plcontinue)
+			query.Set("continue", parsed.Continue.Continue)
+		}
+	}
 
 	return make([]string, 0)
 }
 
 func main() {
 	fmt.Println("Hello, world!")
-	getLinks("TypeScript")
+	// getLinks("Short,_Mississippi")
+	getLinks("JavaScript")
 }

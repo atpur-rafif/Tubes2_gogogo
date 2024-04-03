@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const API = "https://en.wikipedia.org/w/api.php"
@@ -14,7 +15,7 @@ type WikipediaResponse struct {
 	Continue *(struct {
 		Continue   string
 		Plcontinue string
-	}) `json:",omitempty"`
+	})
 	Query struct {
 		Pages map[string](struct {
 			Title string
@@ -25,14 +26,15 @@ type WikipediaResponse struct {
 	}
 }
 
-func getLinks(page string) []string {
+func getLinks(pages []string) map[string][]string {
 	query := url.Values{}
 	query.Add("action", "query")
 	query.Add("format", "json")
 	query.Add("prop", "links")
-	query.Add("pllimit", "50")
-	query.Add("titles", page)
+	query.Add("pllimit", "max")
+	query.Add("titles", strings.Join(pages, "|"))
 
+	links := make(map[string][]string)
 	for {
 		url := fmt.Sprintf("%s?%s", API, query.Encode())
 		response, err := http.Get(url)
@@ -51,8 +53,11 @@ func getLinks(page string) []string {
 			fmt.Println(err)
 		}
 
-		fmt.Println(parsed)
-		fmt.Println(url)
+		for _, page := range parsed.Query.Pages {
+			for _, link := range page.Links {
+				links[page.Title] = append(links[page.Title], link.Title)
+			}
+		}
 
 		if parsed.Continue == nil {
 			break
@@ -62,11 +67,11 @@ func getLinks(page string) []string {
 		}
 	}
 
-	return make([]string, 0)
+	return links
 }
 
 func main() {
 	fmt.Println("Hello, world!")
-	// getLinks("Short,_Mississippi")
-	getLinks("JavaScript")
+	links := getLinks([]string{"Kirby|Short, Mississippi"})
+	fmt.Println(links)
 }

@@ -63,7 +63,6 @@ func getLinks(pages []string) map[string][]string {
 			break
 		} else {
 			query.Set("plcontinue", parsed.Continue.Plcontinue)
-			query.Set("continue", parsed.Continue.Continue)
 		}
 	}
 
@@ -71,7 +70,57 @@ func getLinks(pages []string) map[string][]string {
 }
 
 func main() {
-	fmt.Println("Hello, world!")
-	links := getLinks([]string{"Kirby|Short, Mississippi"})
-	fmt.Println(links)
+	start := "Wikipedia"
+	end := "Knowledge"
+
+	found := false
+	var foundPath []string
+	fmt.Println("Started")
+
+	traversed := make(map[string]bool)
+	stack := make([][]string, 0)
+	stack = append(stack, []string{start})
+	for {
+		batch := make([][]string, 0)
+		tails := make([]string, 0)
+		for len(stack) > 0 && len(batch) < 50 {
+			path := stack[0]
+			stack = stack[1:]
+
+			top := path[len(path)-1]
+			if traversed[top] {
+				continue
+			}
+			traversed[top] = true
+
+			batch = append(batch, path)
+			tails = append(tails, top)
+		}
+
+		links := getLinks(tails)
+		for _, path := range batch {
+			top := path[len(path)-1]
+			for _, page := range links[top] {
+				newPath := make([]string, len(path))
+				copy(newPath, path)
+				newPath = append(newPath, page)
+				stack = append(stack, newPath)
+				fmt.Println(newPath)
+
+				if page == end {
+					found = true
+					foundPath = newPath
+				}
+			}
+
+			if found {
+				break
+			}
+		}
+		if found {
+			break
+		}
+	}
+	fmt.Println(foundPath)
+	fmt.Println("Finished")
 }

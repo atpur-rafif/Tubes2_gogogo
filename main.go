@@ -26,6 +26,7 @@ func main() {
 		end := ends[0]
 
 		fmt.Println(start, end)
+		fmt.Fprintf(w, "%s %s", start, end)
 	})
 
 	http.Handle("/", http.FileServer(http.Dir("./static")))

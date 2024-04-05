@@ -11,5 +11,7 @@ $("search-button").addEventListener("click", async () => {
 		return
 	}
 
-	console.log(start, end)
+	const req = await fetch(encodeURI(`/api?start=${start}&end=${end}`))
+	const body = await req.text()
+	console.log(body)
 })

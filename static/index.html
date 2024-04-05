@@ -3,16 +3,19 @@
 
 <head>
 	<title>gogogo</title>
-	<script src="/index.js"></script>
+	<script defer src="/index.js"></script>
 	<link rel="stylesheet" href="/index.css">
 </head>
 
 <body>
 	<div id="container">
 		<div id="input-container">
-			<input type="text">
-			<span>➡️</span>
-			<input type="text">
+			<div id="text-input-container">
+				<input id="input-start" type="text">
+				<span>➡️</span>
+				<input id="input-end" type="text">
+			</div>
+			<button id="search-button">Search</button>
 		</div>
 	</div>
 </body>

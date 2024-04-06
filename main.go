@@ -2,125 +2,103 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
+	"log"
 	"net/http"
-	"net/url"
-	"strings"
+
+	"github.com/gorilla/websocket"
 )
 
-const API = "https://en.wikipedia.org/w/api.php"
+type TraverseFunction func(string, string, chan Response, chan bool)
 
-type WikipediaResponse struct {
-	Continue *(struct {
-		Continue   string
-		Plcontinue string
-	})
-	Query struct {
-		Pages map[string](struct {
-			Title string
-			Links [](struct {
-				Title string
-			})
-		})
-	}
+func run(start, end string, channel chan Response, forceQuit chan bool) {
+	var fn TraverseFunction
+	fn = SearchBFS
+	fn(start, end, channel, forceQuit)
 }
 
-func getLinks(pages []string) map[string][]string {
-	query := url.Values{}
-	query.Add("action", "query")
-	query.Add("format", "json")
-	query.Add("prop", "links")
-	query.Add("pllimit", "max")
-	query.Add("titles", strings.Join(pages, "|"))
-
-	links := make(map[string][]string)
-	for {
-		url := fmt.Sprintf("%s?%s", API, query.Encode())
-		response, err := http.Get(url)
-		if err != nil {
-			panic(err)
-		}
-		defer response.Body.Close()
-		byte, err := io.ReadAll(response.Body)
-		if err != nil {
-			panic(err)
-		}
-
-		var parsed WikipediaResponse
-		err = json.Unmarshal(byte, &parsed)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		for _, page := range parsed.Query.Pages {
-			for _, link := range page.Links {
-				links[page.Title] = append(links[page.Title], link.Title)
-			}
-		}
-
-		if parsed.Continue == nil {
-			break
-		} else {
-			query.Set("plcontinue", parsed.Continue.Plcontinue)
-		}
-	}
-
-	return links
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 }
 
 func main() {
-	start := "Wikipedia"
-	end := "Knowledge"
-
-	found := false
-	var foundPath []string
-	fmt.Println("Started")
-
-	traversed := make(map[string]bool)
-	stack := make([][]string, 0)
-	stack = append(stack, []string{start})
-	for {
-		batch := make([][]string, 0)
-		tails := make([]string, 0)
-		for len(stack) > 0 && len(batch) < 50 {
-			path := stack[0]
-			stack = stack[1:]
-
-			top := path[len(path)-1]
-			if traversed[top] {
-				continue
-			}
-			traversed[top] = true
-
-			batch = append(batch, path)
-			tails = append(tails, top)
+	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+			return
 		}
 
-		links := getLinks(tails)
-		for _, path := range batch {
-			top := path[len(path)-1]
-			for _, page := range links[top] {
-				newPath := make([]string, len(path))
-				copy(newPath, path)
-				newPath = append(newPath, page)
-				stack = append(stack, newPath)
-				fmt.Println(newPath)
+		write := make(chan Response)
+		read := make(chan Request)
+		forceQuit := make(chan bool)
 
-				if page == end {
-					found = true
-					foundPath = newPath
+		go func(conn *websocket.Conn) {
+			for {
+				msgType, msg, err := conn.ReadMessage()
+				if err != nil {
+					log.Println(err)
+					forceQuit <- true
+					break
+				}
+
+				if msgType == websocket.TextMessage {
+					var request Request
+					json.Unmarshal(msg, &request)
+
+					if len(request.Start) == 0 || len(request.End) == 0 {
+						write <- Response{
+							Status:  Error,
+							Message: `Empty "start" or "end" of field`,
+						}
+						continue
+					}
+
+					read <- request
 				}
 			}
+		}(conn)
 
-			if found {
+		go func(conn *websocket.Conn) {
+			for {
+				select {
+				case <-forceQuit:
+					break
+				case msg := <-write:
+					conn.WriteJSON(msg)
+				}
+			}
+		}(conn)
+
+		running := false
+		finished := make(chan bool)
+		for {
+			select {
+			case <-finished:
+				running = false
+			case <-forceQuit:
 				break
+			case req := <-read:
+				if running {
+					write <- Response{
+						Status:  Error,
+						Message: "Program still running",
+					}
+					continue
+				}
+
+				running = true
+				go func() {
+					run(req.Start, req.End, write, forceQuit)
+					finished <- true
+				}()
 			}
 		}
-		if found {
-			break
-		}
+	})
+
+	http.Handle("/", http.FileServer(http.Dir("./static")))
+	err := http.ListenAndServe(":3000", nil)
+	if err != nil {
+		panic(err)
 	}
-	fmt.Println(foundPath)
-	fmt.Println("Finished")
 }

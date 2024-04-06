@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -50,25 +49,33 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
-func run(start, end string, channel chan Response, stop chan bool, _ chan bool) {
-	channel <- Response{
-		Status:  Started,
-		Message: start + ";" + end,
-	}
+func run(start, end string, channel chan Response, forceQuit chan bool) {
+	linksChan := make(chan Links)
 
-	for i := 0; i < 100; i++ {
-		time.Sleep(100 * time.Millisecond)
-		channel <- Response{
-			Status:  Update,
-			Message: "Update...",
+	goroutineEnded := make(chan bool)
+
+	go func() {
+		getLinks([]string{start, end}, linksChan)
+		goroutineEnded <- true
+	}()
+
+L:
+	for {
+		select {
+		case <-goroutineEnded:
+			break L
+		case <-forceQuit:
+			break L
+		case links := <-linksChan:
+			from := links.from
+			for _, to := range links.to {
+				channel <- Response{
+					Status:  Update,
+					Message: from + " -> " + to,
+				}
+			}
 		}
 	}
-
-	channel <- Response{
-		Status:  Finished,
-		Message: start + ";" + end,
-	}
-	stop <- true
 }
 
 func main() {
@@ -81,15 +88,14 @@ func main() {
 
 		write := make(chan Response)
 		read := make(chan Request)
-		end := make(chan bool)
-		stop := make(chan bool)
+		forceQuit := make(chan bool)
 
-		go func(conn *websocket.Conn, read chan Request, write chan Response, quit chan bool) {
+		go func(conn *websocket.Conn) {
 			for {
 				msgType, msg, err := conn.ReadMessage()
 				if err != nil {
 					log.Println(err)
-					quit <- true
+					forceQuit <- true
 					break
 				}
 
@@ -108,26 +114,27 @@ func main() {
 					read <- request
 				}
 			}
-		}(conn, read, write, end)
+		}(conn)
 
-		go func(conn *websocket.Conn, read chan Request, write chan Response, quit chan bool) {
+		go func(conn *websocket.Conn) {
 			for {
 				select {
-				case <-quit:
+				case <-forceQuit:
 					break
 				case msg := <-write:
 					conn.WriteJSON(msg)
 				}
 			}
-		}(conn, read, write, end)
+		}(conn)
 
 		running := false
+		finished := make(chan bool)
 		for {
 			select {
-			case <-end:
-				break
-			case <-stop:
+			case <-finished:
 				running = false
+			case <-forceQuit:
+				break
 			case req := <-read:
 				if running {
 					write <- Response{
@@ -137,8 +144,11 @@ func main() {
 					continue
 				}
 
-				go run(req.Start, req.End, write, stop, end)
 				running = true
+				go func() {
+					run(req.Start, req.End, write, forceQuit)
+					finished <- true
+				}()
 			}
 		}
 	})

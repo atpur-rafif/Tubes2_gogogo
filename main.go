@@ -50,10 +50,17 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
-func run(start, end string, channel chan string) {
+func run(start, end string, channel chan Response, stop chan bool, _ chan bool) {
+	channel <- Response{
+		Status:  Started,
+		Message: start + ";" + end,
+	}
 	time.Sleep(5 * time.Second)
-	channel <- start + ";" + end
-	close(channel)
+	channel <- Response{
+		Status:  Finished,
+		Message: start + ";" + end,
+	}
+	stop <- true
 }
 
 func main() {
@@ -66,7 +73,8 @@ func main() {
 
 		write := make(chan Response)
 		read := make(chan Request)
-		quit := make(chan bool)
+		end := make(chan bool)
+		stop := make(chan bool)
 
 		go func(conn *websocket.Conn, read chan Request, write chan Response, quit chan bool) {
 			for {
@@ -92,7 +100,7 @@ func main() {
 					read <- request
 				}
 			}
-		}(conn, read, write, quit)
+		}(conn, read, write, end)
 
 		go func(conn *websocket.Conn, read chan Request, write chan Response, quit chan bool) {
 			for {
@@ -103,13 +111,26 @@ func main() {
 					conn.WriteJSON(msg)
 				}
 			}
-		}(conn, read, write, quit)
+		}(conn, read, write, end)
 
-		for msg := range read {
-			log.Println(msg)
-			write <- Response{
-				Status:  Started,
-				Message: msg.Start + ";" + msg.End,
+		running := false
+		for {
+			select {
+			case <-end:
+				break
+			case <-stop:
+				running = false
+			case req := <-read:
+				if running {
+					write <- Response{
+						Status:  Error,
+						Message: "Program still running",
+					}
+					continue
+				}
+
+				go run(req.Start, req.End, write, stop, end)
+				running = true
 			}
 		}
 	})

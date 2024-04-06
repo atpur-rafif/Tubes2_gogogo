@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,12 +23,12 @@ const (
 
 type Status uint8
 
-type ClientRequest struct {
+type Request struct {
 	Start string
 	End   string
 }
 
-type ClientResponse struct {
+type Response struct {
 	Status  Status `json:"status"`
 	Message string `json:"message"`
 }
@@ -49,6 +50,12 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
+func run(start, end string, channel chan string) {
+	time.Sleep(5 * time.Second)
+	channel <- start + ";" + end
+	close(channel)
+}
+
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -57,27 +64,53 @@ func main() {
 			return
 		}
 
-		for {
-			msgType, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Println(err)
-				break
-			}
+		write := make(chan Response)
+		read := make(chan Request)
+		quit := make(chan bool)
 
-			if msgType == websocket.TextMessage {
-				var request ClientRequest
-				json.Unmarshal(msg, &request)
-
-				if len(request.Start) == 0 || len(request.End) == 0 {
-					conn.WriteJSON(&ClientResponse{
-						Status:  Error,
-						Message: `Empty "start" or "end" of field`,
-					})
+		go func(conn *websocket.Conn, read chan Request, write chan Response, quit chan bool) {
+			for {
+				msgType, msg, err := conn.ReadMessage()
+				if err != nil {
+					log.Println(err)
+					quit <- true
+					break
 				}
 
-				log.Println(request)
-			}
+				if msgType == websocket.TextMessage {
+					var request Request
+					json.Unmarshal(msg, &request)
 
+					if len(request.Start) == 0 || len(request.End) == 0 {
+						write <- Response{
+							Status:  Error,
+							Message: `Empty "start" or "end" of field`,
+						}
+						continue
+					}
+
+					read <- request
+				}
+			}
+		}(conn, read, write, quit)
+
+		go func(conn *websocket.Conn, read chan Request, write chan Response, quit chan bool) {
+			for {
+				select {
+				case <-quit:
+					break
+				case msg := <-write:
+					conn.WriteJSON(msg)
+				}
+			}
+		}(conn, read, write, quit)
+
+		for msg := range read {
+			log.Println(msg)
+			write <- Response{
+				Status:  Started,
+				Message: msg.Start + ";" + msg.End,
+			}
 		}
 	})
 

@@ -8,10 +8,31 @@ ws.addEventListener("error", (e) => {
 	console.log(e)
 })
 
+function showUpdate(str) {
+	const el = $("update-container")
+	el.classList.add("show")
+	el.insertAdjacentHTML("beforeend", `<p>${str}</p>`)
+	if (el.scrollTop > el.scrollHeight - 2 * el.clientHeight)
+		el.scrollTop = el.scrollHeight
+}
+
+function clearUpdate() {
+	const el = $("update-container")
+	el.classList.remove("show")
+	el.innerHTML = ""
+}
+
 ws.addEventListener("message", (e) => {
-	/** @type {{ status: "error" | "update" | "success", message: string}} */
+	/** @type {{ status: "error" | "update" | "started" | "finished", message: string}} */
 	const data = JSON.parse(e.data)
-	console.log(data)
+	if (data.status == "error") {
+		alert(data.message)
+		return
+	} else if (data.status == "started") showUpdate("Started...")
+	else if (data.status == "update") showUpdate(data.message)
+	else if (data.status == "finished") {
+		clearUpdate()
+	}
 })
 
 $("search-button").addEventListener("click", async () => {

@@ -5,10 +5,22 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	margin: 0px;
 }
 
 button {
 	border: none;
+}
+
+p {
+	margin: 0px;
+}
+
+#container {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	max-height: 80vh;
 }
 
 #input-container {
@@ -29,4 +41,17 @@ button {
 	align-items: center;
 	gap: 1rem;
 	color: white;
+}
+
+#update-container {
+	color: white;
+	display: flex;
+	flex-direction: column;
+	height: 0rem;
+	overflow: auto;
+	transition: height 1s ease-out;
+}
+
+#update-container.show {
+	height: 10rem;
 }

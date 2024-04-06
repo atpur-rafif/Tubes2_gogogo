@@ -55,7 +55,15 @@ func run(start, end string, channel chan Response, stop chan bool, _ chan bool) 
 		Status:  Started,
 		Message: start + ";" + end,
 	}
-	time.Sleep(5 * time.Second)
+
+	for i := 0; i < 100; i++ {
+		time.Sleep(100 * time.Millisecond)
+		channel <- Response{
+			Status:  Update,
+			Message: "Update...",
+		}
+	}
+
 	channel <- Response{
 		Status:  Finished,
 		Message: start + ";" + end,

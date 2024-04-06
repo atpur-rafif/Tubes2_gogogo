@@ -9,21 +9,6 @@ import (
 	"strings"
 )
 
-type WikipediaResponse struct {
-	Continue *(struct {
-		Continue   string
-		Plcontinue string
-	})
-	Query struct {
-		Pages map[string](struct {
-			Title string
-			Links [](struct {
-				Title string
-			})
-		})
-	}
-}
-
 type Links struct {
 	from string
 	to   []string

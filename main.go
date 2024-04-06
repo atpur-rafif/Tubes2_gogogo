@@ -8,74 +8,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type TraverseFunction func(string, string, chan Response, chan bool)
+
+func run(start, end string, channel chan Response, forceQuit chan bool) {
+	var fn TraverseFunction
+	fn = SearchBFS
+	fn(start, end, channel, forceQuit)
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-}
-
-const (
-	Update = iota + 1
-	Started
-	Finished
-	Error
-)
-
-type Status uint8
-
-type Request struct {
-	Start string
-	End   string
-}
-
-type Response struct {
-	Status  Status `json:"status"`
-	Message string `json:"message"`
-}
-
-func (s Status) String() string {
-	switch s {
-	case Update:
-		return "update"
-	case Started:
-		return "started"
-	case Finished:
-		return "finished"
-	default:
-		return "error"
-	}
-}
-
-func (s Status) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
-}
-
-func run(start, end string, channel chan Response, forceQuit chan bool) {
-	linksChan := make(chan Links)
-
-	goroutineEnded := make(chan bool)
-
-	go func() {
-		getLinks([]string{start, end}, linksChan)
-		goroutineEnded <- true
-	}()
-
-L:
-	for {
-		select {
-		case <-goroutineEnded:
-			break L
-		case <-forceQuit:
-			break L
-		case links := <-linksChan:
-			from := links.from
-			for _, to := range links.to {
-				channel <- Response{
-					Status:  Update,
-					Message: from + " -> " + to,
-				}
-			}
-		}
-	}
 }
 
 func main() {

@@ -10,10 +10,11 @@ import (
 )
 
 type Links struct {
-	from string
-	to   []string
+	From string
+	To   []string
 }
 
+// TODO: Cancelation
 func getLinks(pages []string, channel chan Links) {
 	query := url.Values{}
 	query.Add("action", "query")
@@ -47,8 +48,8 @@ func getLinks(pages []string, channel chan Links) {
 			}
 
 			channel <- Links{
-				from: page.Title,
-				to:   to,
+				From: page.Title,
+				To:   to,
 			}
 		}
 

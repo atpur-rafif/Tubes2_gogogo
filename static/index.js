@@ -13,6 +13,9 @@ function showUpdate(str) {
 	el.classList.add("show")
 	el.insertAdjacentHTML("beforeend", `<p>${str}</p>`)
 	el.scrollTop = el.scrollHeight
+	if (el.childElementCount > 20) {
+		el.firstChild.remove()
+	}
 }
 
 function clearUpdate() {
@@ -31,6 +34,7 @@ ws.addEventListener("message", (e) => {
 	else if (data.status == "update") showUpdate(data.message)
 	else if (data.status == "finished") {
 		clearUpdate()
+		showUpdate(data.message)
 	}
 })
 

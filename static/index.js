@@ -12,8 +12,7 @@ function showUpdate(str) {
 	const el = $("update-container")
 	el.classList.add("show")
 	el.insertAdjacentHTML("beforeend", `<p>${str}</p>`)
-	if (el.scrollTop > el.scrollHeight - 2 * el.clientHeight)
-		el.scrollTop = el.scrollHeight
+	el.scrollTop = el.scrollHeight
 }
 
 function clearUpdate() {

@@ -22,6 +22,10 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
+	scrap()
+}
+
+func main_old() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {

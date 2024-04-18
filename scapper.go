@@ -11,21 +11,21 @@ import (
 	"golang.org/x/net/html"
 )
 
-func toAbsUrl(from, to *url.URL) string {
+func toAbsUrl(from, to *url.URL) url.URL {
 	toStr := to.String()
 	if to.IsAbs() {
-		return toStr
+		return *to
 	} else {
-		if strings.HasPrefix(toStr, "//") {
-			return from.Scheme + ":" + toStr
-		} else {
-			return from.Scheme + "://" + from.Host + toStr
+		to.Scheme = from.Scheme
+		if !strings.HasPrefix(toStr, "//") {
+			to.Host = from.Host
 		}
+		return *to
 	}
 }
 
 func scrap() {
-	urlStr := "https://en.wikipedia.org/wiki/Main_Page"
+	urlStr := "https://en.wikipedia.org/wiki/Elon Musk"
 	from, err := url.Parse(urlStr)
 	if err != nil {
 		log.Println("Can't parse URL " + urlStr)
@@ -38,7 +38,9 @@ func scrap() {
 	}
 	defer response.Body.Close()
 
+	insideMain := false
 	tokenizer := html.NewTokenizer(response.Body)
+	count := 0
 	for {
 		token := tokenizer.Next()
 		if token == html.ErrorToken {
@@ -46,6 +48,18 @@ func scrap() {
 		}
 
 		name, _ := tokenizer.TagName()
+		if bytes.Equal(name, []byte("main")) {
+			if token == html.StartTagToken {
+				insideMain = true
+			} else if token == html.EndTagToken {
+				insideMain = false
+			}
+		}
+
+		if !insideMain {
+			continue
+		}
+
 		if bytes.Equal(name, []byte("a")) {
 			for {
 				key, value, next := tokenizer.TagAttr()
@@ -56,14 +70,18 @@ func scrap() {
 						log.Println("Can't parse URL " + str)
 						continue
 					}
-					absUrl := toAbsUrl(from, to)
-					fmt.Println(absUrl)
+					absTo := toAbsUrl(from, to)
+					if absTo.Host == from.Host && strings.HasPrefix(absTo.Path, "/wiki/") {
+						fmt.Println(absTo.Path)
+					}
 				}
 
 				if !next {
 					break
 				}
 			}
+			count += 1
 		}
 	}
+	fmt.Println("Count:", count)
 }

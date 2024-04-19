@@ -3,6 +3,7 @@ package main
 import "encoding/json"
 
 const API = "https://en.wikipedia.org/w/api.php"
+const WIKI = "https://en.wikipedia.org/wiki"
 
 type WikipediaResponse struct {
 	Continue *(struct {

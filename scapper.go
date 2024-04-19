@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -24,17 +23,19 @@ func toAbsUrl(from, to *url.URL) url.URL {
 	}
 }
 
-func scrap() {
-	urlStr := "https://en.wikipedia.org/wiki/Elon Musk"
+func scrap(urlStr string) []string {
+	result := make([]string, 0)
 	from, err := url.Parse(urlStr)
 	if err != nil {
 		log.Println("Can't parse URL " + urlStr)
-		return
+		return result
 	}
 
+	log.Println("[Scrapper] Visiting  " + urlStr)
 	response, err := http.Get(urlStr)
 	if err != nil {
-		panic(err)
+		log.Println("Can't visit URL " + urlStr)
+		return result
 	}
 	defer response.Body.Close()
 
@@ -71,9 +72,7 @@ func scrap() {
 						continue
 					}
 					absTo := toAbsUrl(from, to)
-					if absTo.Host == from.Host && strings.HasPrefix(absTo.Path, "/wiki/") {
-						fmt.Println(absTo.Path)
-					}
+					result = append(result, absTo.String())
 				}
 
 				if !next {
@@ -83,5 +82,7 @@ func scrap() {
 			count += 1
 		}
 	}
-	fmt.Println("Count:", count)
+	log.Println("[Scrapper] Links found in "+urlStr+":", len(result))
+
+	return result
 }

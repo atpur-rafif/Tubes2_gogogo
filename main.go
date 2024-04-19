@@ -22,10 +22,6 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
-	scrap()
-}
-
-func main_old() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -101,6 +97,7 @@ func main_old() {
 	})
 
 	http.Handle("/", http.FileServer(http.Dir("./static")))
+	log.Println("Listening on port 3000")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {
 		panic(err)

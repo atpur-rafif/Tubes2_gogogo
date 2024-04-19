@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strings"
 )
 
@@ -12,6 +13,10 @@ func SearchBFS(start, end string, channel chan Response, forceQuit chan bool) {
 	var found []string
 LO:
 	for {
+		if len(stack) == 0 {
+			log.Println("Link from " + start + " to " + end + " not found")
+			break
+		}
 		path := stack[0]
 		stack = stack[1:]
 
@@ -24,7 +29,7 @@ LO:
 		linksChan := make(chan Links)
 		finished := make(chan bool)
 		go func() {
-			getLinks([]string{top}, linksChan)
+			getLinks2([]string{top}, linksChan)
 			finished <- true
 		}()
 
@@ -47,10 +52,15 @@ LO:
 						break LO
 					}
 
-					channel <- Response{
-						Status:  Update,
-						Message: link.From + " ➡️ " + to,
-					}
+					// channel <- Response{
+					// 	Status:  Update,
+					// 	Message: link.From + " ➡️ " + to,
+					// }
+				}
+
+				channel <- Response{
+					Status:  Update,
+					Message: "Visited " + link.From,
 				}
 			}
 		}

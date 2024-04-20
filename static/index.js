@@ -71,6 +71,7 @@ $("search-button").addEventListener("click", async () => {
 			return
 		}
 		force = true
+		stopTimer()
 	}
 
 	const start = $("input-start").value

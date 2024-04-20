@@ -94,10 +94,15 @@ p {
 	display: flex;
 	flex-direction: column;
 	height: 0rem;
-	overflow: auto;
+	overflow: hidden;
 	transition: height 1s ease-out;
 }
 
 #update-container.show {
 	height: 10rem;
+}
+
+#time-taken {
+	margin-left: 0.5rem;
+	margin-right: 0.5rem;
 }

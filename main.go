@@ -1,7 +1,9 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
+	"io/fs"
 	"log"
 	"net/http"
 
@@ -23,6 +25,9 @@ var upgrader = websocket.Upgrader{
 // 		log.Println(response.Message)
 // 	}
 // }
+
+//go:embed static/*
+var static embed.FS
 
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +127,8 @@ func main() {
 		}
 	})
 
-	http.Handle("/", http.FileServer(http.Dir("./static")))
+	content, _ := fs.Sub(static, "static")
+	http.Handle("/", http.FileServer(http.FS(content)))
 	log.Println("Listening on port 3000")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {

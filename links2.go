@@ -8,7 +8,10 @@ import (
 
 const WIKI = "https://en.wikipedia.org/wiki/"
 
-func getPages(links []string) []string {
+type Pages []string
+
+// TODO: Filter namespace
+func getPages(links []string) Pages {
 	pages := make([]string, 0)
 	for _, to := range links {
 		if strings.HasPrefix(to, WIKI) {
@@ -26,13 +29,6 @@ func getPages(links []string) []string {
 	return pages
 }
 
-func getLinks2(pages []string, channel chan Links) {
-	for _, page := range pages {
-		url := WIKI + page
-
-		channel <- Links{
-			From: page,
-			To:   getPages(scrap(url)),
-		}
-	}
+func getLinks2(page string) Pages {
+	return getPages(scrap(WIKI + page))
 }

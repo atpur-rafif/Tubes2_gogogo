@@ -8,8 +8,37 @@ body {
 	margin: 0px;
 }
 
-button {
+input {
+	outline: none;
 	border: none;
+	border-bottom: 0.3rem solid white;
+}
+
+input:focus {
+	border: none;
+	border-bottom: 0.3rem solid blue;
+}
+
+button {
+	cursor: pointer;
+	border: none;
+	outline: none;
+	border-bottom: 0.2rem solid white;
+}
+
+button:focus {
+	border-bottom: 0.2rem solid blue;
+}
+
+select {
+	cursor: pointer;
+	outline: none;
+	border: none;
+	border-bottom: 0.2rem solid white;
+}
+
+select:focus {
+	border-bottom: 0.2rem solid blue;
 }
 
 p {
@@ -54,15 +83,26 @@ p {
 	color: white;
 }
 
+#option-input-container {
+	display: flex;
+	flex-direction: row;
+	width: 100%;
+}
+
 #update-container {
 	color: white;
 	display: flex;
 	flex-direction: column;
 	height: 0rem;
-	overflow: auto;
+	overflow: hidden;
 	transition: height 1s ease-out;
 }
 
 #update-container.show {
 	height: 10rem;
+}
+
+#time-taken {
+	margin-left: 0.5rem;
+	margin-right: 0.5rem;
 }

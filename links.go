@@ -1,64 +1,34 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 )
 
-type Links struct {
-	From string
-	To   []string
-}
+const WIKI = "https://en.wikipedia.org/wiki/"
 
-// TODO: Cancelation
-func getLinks(pages []string, channel chan Links) {
-	query := url.Values{}
-	query.Add("action", "query")
-	query.Add("format", "json")
-	query.Add("prop", "links")
-	query.Add("pllimit", "max")
-	query.Add("titles", strings.Join(pages, "|"))
+type Pages []string
 
-	for {
-		url := fmt.Sprintf("%s?%s", API, query.Encode())
-		response, err := http.Get(url)
-		if err != nil {
-			panic(err)
-		}
-		defer response.Body.Close()
-		byte, err := io.ReadAll(response.Body)
-		if err != nil {
-			panic(err)
-		}
-
-		var parsed WikipediaResponse
-		err = json.Unmarshal(byte, &parsed)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		for _, page := range parsed.Query.Pages {
-			to := make([]string, 0)
-			for _, link := range page.Links {
-				to = append(to, link.Title)
+// TODO: Filter namespace
+func getPages(links []string) Pages {
+	pages := make([]string, 0)
+	for _, to := range links {
+		if strings.HasPrefix(to, WIKI) {
+			toPage, _ := filepath.Rel(WIKI, to)
+			if !strings.ContainsAny(toPage, ":#") {
+				res, err := url.QueryUnescape(toPage)
+				if err != nil {
+					res = toPage
+				}
+				pages = append(pages, res)
 			}
-
-			channel <- Links{
-				From: page.Title,
-				To:   to,
-			}
-		}
-
-		if parsed.Continue == nil {
-			break
-		} else {
-			query.Set("plcontinue", parsed.Continue.Plcontinue)
 		}
 	}
 
-	close(channel)
+	return pages
+}
+
+func getLinks(page string) Pages {
+	return getPages(scrap(WIKI + page))
 }

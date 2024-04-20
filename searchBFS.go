@@ -1,63 +1,88 @@
 package main
 
 import (
+	"log"
 	"strings"
 )
 
-func SearchBFS(start, end string, channel chan Response, forceQuit chan bool) {
-	stack := make([][]string, 0)
-	visited := make(map[string]bool)
-	stack = append(stack, []string{start})
+const MAX_CONCURRENT = 10
 
-	var found []string
-LO:
-	for {
-		path := stack[0]
-		stack = stack[1:]
+type StateBFS struct {
+	Stack   [][]string
+	Visited map[string]bool
+	Running int
+}
 
+type Visit struct {
+	Path []string
+	Next []string
+}
+
+func runStack(state *StateBFS, linksChan chan Visit) {
+	for len((*state).Stack) > 0 && (*state).Running < MAX_CONCURRENT {
+		path := (*state).Stack[0]
+		(*state).Stack = (*state).Stack[1:]
 		top := path[len(path)-1]
-		if visited[top] {
+
+		if (*state).Visited[top] {
 			continue
 		}
-		visited[top] = true
+		(*state).Visited[top] = true
 
-		linksChan := make(chan Links)
-		finished := make(chan bool)
+		(*state).Running += 1
 		go func() {
-			getLinks([]string{top}, linksChan)
-			finished <- true
+			linksChan <- Visit{
+				Path: path,
+				Next: getLinks(top),
+			}
 		}()
+	}
+}
 
-	L:
-		for {
-			select {
-			case <-finished:
-				break L
-			case <-forceQuit:
-				break LO
-			case link := <-linksChan:
-				for _, to := range link.To {
-					newPath := make([]string, len(path))
-					copy(newPath, path)
-					newPath = append(newPath, to)
-					stack = append(stack, newPath)
+func SearchBFS(start, end string, channel chan Response, forceQuit chan bool) {
+	var resultPath []string
+	state := StateBFS{
+		Stack:   make([][]string, 0),
+		Visited: make(map[string]bool),
+		Running: 0,
+	}
+	state.Stack = append(state.Stack, []string{start})
 
-					if to == end {
-						found = newPath
-						break LO
-					}
+	visitChan := make(chan Visit)
+	log.Println(state)
+	runStack(&state, visitChan)
 
-					channel <- Response{
-						Status:  Update,
-						Message: link.From + " ➡️ " + to,
-					}
+L:
+	for {
+		select {
+		case <-forceQuit:
+			break L
+		case visit := <-visitChan:
+			for _, next := range visit.Next {
+				newPath := make([]string, len(visit.Path))
+				copy(newPath, visit.Path)
+				newPath = append(newPath, next)
+				state.Stack = append(state.Stack, newPath)
+
+				if next == end {
+					resultPath = newPath
+					break L
 				}
 			}
+
+			channel <- Response{
+				Status:  Update,
+				Message: "Visited " + visit.Path[len(visit.Path)-1],
+			}
+
+			state.Running -= 1
+			runStack(&state, visitChan)
+			log.Println("Running:", state.Running)
 		}
 	}
 
 	channel <- Response{
 		Status:  Finished,
-		Message: strings.Join(found, " ➡️ "),
+		Message: strings.Join(resultPath, " ➡️ "),
 	}
 }

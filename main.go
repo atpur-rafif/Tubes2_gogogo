@@ -21,6 +21,15 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+// func main() {
+// 	forceQuit := make(chan bool)
+// 	responses := make(chan Response)
+// 	go SearchBFS("Highway", "Traffic", responses, forceQuit)
+// 	for response := range responses {
+// 		log.Println(response.Message)
+// 	}
+// }
+
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -97,6 +106,7 @@ func main() {
 	})
 
 	http.Handle("/", http.FileServer(http.Dir("./static")))
+	log.Println("Listening on port 3000")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {
 		panic(err)

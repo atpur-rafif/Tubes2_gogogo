@@ -10,12 +10,6 @@ import (
 
 type TraverseFunction func(string, string, chan Response, chan bool)
 
-func run(start, end string, channel chan Response, forceQuit chan bool) {
-	var fn TraverseFunction
-	fn = SearchBFS
-	fn(start, end, channel, forceQuit)
-}
-
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -63,6 +57,14 @@ func main() {
 						continue
 					}
 
+					if request.Type != "BFS" && request.Type != "IDS" {
+						write <- Response{
+							Status:  Error,
+							Message: "Invalid method",
+						}
+						continue
+					}
+
 					read <- request
 				}
 			}
@@ -81,24 +83,39 @@ func main() {
 
 		running := false
 		finished := make(chan bool)
+		forceQuitRun := make(chan bool)
 		for {
 			select {
 			case <-finished:
 				running = false
 			case <-forceQuit:
+				log.Println("End")
+				forceQuitRun <- true
 				break
 			case req := <-read:
 				if running {
-					write <- Response{
-						Status:  Error,
-						Message: "Program still running",
+					if req.Force {
+						forceQuitRun <- true
+					} else {
+						write <- Response{
+							Status:  Error,
+							Message: "Program still running",
+						}
+						continue
 					}
-					continue
 				}
 
 				running = true
 				go func() {
-					run(req.Start, req.End, write, forceQuit)
+					var fn TraverseFunction
+					if req.Type == "BFS" {
+						fn = SearchBFS
+					} else if req.Type == "IDS" {
+						log.Panic("Invalid method")
+					} else {
+						log.Panic("Invalid method")
+					}
+					fn(req.Start, req.End, write, forceQuitRun)
 					finished <- true
 				}()
 			}

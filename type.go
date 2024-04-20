@@ -31,6 +31,8 @@ type Status uint8
 type Request struct {
 	Start string
 	End   string
+	Force bool
+	Type  string
 }
 
 type Response struct {

@@ -8,8 +8,37 @@ body {
 	margin: 0px;
 }
 
-button {
+input {
+	outline: none;
 	border: none;
+	border-bottom: 0.3rem solid white;
+}
+
+input:focus {
+	border: none;
+	border-bottom: 0.3rem solid blue;
+}
+
+button {
+	cursor: pointer;
+	border: none;
+	outline: none;
+	border-bottom: 0.2rem solid white;
+}
+
+button:focus {
+	border-bottom: 0.2rem solid blue;
+}
+
+select {
+	cursor: pointer;
+	outline: none;
+	border: none;
+	border-bottom: 0.2rem solid white;
+}
+
+select:focus {
+	border-bottom: 0.2rem solid blue;
 }
 
 p {
@@ -52,6 +81,12 @@ p {
 	align-items: center;
 	gap: 1rem;
 	color: white;
+}
+
+#option-input-container {
+	display: flex;
+	flex-direction: row;
+	width: 100%;
 }
 
 #update-container {

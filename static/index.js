@@ -3,6 +3,9 @@ function $(id) {
 }
 
 const ws = new WebSocket("/api")
+const state = {
+	running: false,
+}
 
 ws.addEventListener("error", (e) => {
 	console.log(e)
@@ -30,9 +33,14 @@ ws.addEventListener("message", (e) => {
 	if (data.status == "error") {
 		alert(data.message)
 		return
-	} else if (data.status == "started") showUpdate("Started...")
+	} else if (data.status == "started") {
+		state.running = true
+		clearUpdate()
+		showUpdate("Started...")
+	}
 	else if (data.status == "update") showUpdate(data.message)
 	else if (data.status == "finished") {
+		state.running = false
 		clearUpdate()
 		showUpdate(data.message)
 	}
@@ -41,15 +49,24 @@ ws.addEventListener("message", (e) => {
 $("input-start").value = "Highway"
 $("input-end").value = "Traffic"
 $("search-button").addEventListener("click", async () => {
+	let force = false
+	if (state.running) {
+		if (!confirm("Program still running, cancel and search the new one?")) {
+			return
+		}
+		force = true
+	}
+
 	const start = $("input-start").value
 	const end = $("input-end").value
+	const type = $("input-method").value
 
-	// if (start == "" || end == "") {
-	// 	alert("Input still empty!")
-	// 	return
-	// }
+	if (start == "" || end == "") {
+		alert("Input still empty!")
+		return
+	}
 
 	ws.send(JSON.stringify({
-		start, end
+		start, end, type, force
 	}))
 })

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strings"
 )
 
@@ -49,14 +48,18 @@ func SearchBFS(start, end string, channel chan Response, forceQuit chan bool) {
 	state.Stack = append(state.Stack, []string{start})
 
 	visitChan := make(chan Visit)
-	log.Println(state)
 	runStack(&state, visitChan)
+
+	channel <- Response{
+		Status:  Started,
+		Message: "From " + start + " to " + end,
+	}
 
 L:
 	for {
 		select {
 		case <-forceQuit:
-			break L
+			return
 		case visit := <-visitChan:
 			for _, next := range visit.Next {
 				newPath := make([]string, len(visit.Path))
@@ -77,7 +80,6 @@ L:
 
 			state.Running -= 1
 			runStack(&state, visitChan)
-			log.Println("Running:", state.Running)
 		}
 	}
 

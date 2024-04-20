@@ -38,6 +38,8 @@ ws.addEventListener("message", (e) => {
 	}
 })
 
+$("input-start").value = "Highway"
+$("input-end").value = "Traffic"
 $("search-button").addEventListener("click", async () => {
 	const start = $("input-start").value
 	const end = $("input-end").value

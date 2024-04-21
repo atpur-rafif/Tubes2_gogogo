@@ -1,5 +1,7 @@
 package main
 
+// import "log"
+
 type Node struct {
 	nilai    string
 	tetangga []*Node
@@ -12,6 +14,7 @@ func (n *Node) AddTetangga(tetangga string) {
 	n.tetangga = append(n.tetangga, newNode)
 }
 
+// harusnya udah benar
 func BuatGraf(input *Node, depth int) { // root = depth 0
 	if depth != 0 {
 		listNewNode := getLinks(input.nilai)
@@ -21,6 +24,7 @@ func BuatGraf(input *Node, depth int) { // root = depth 0
 			// }
 			// buatGraf(newNode, depth)
 			input.AddTetangga(listNewNode[i])
+			// log.Printf(listNewNode[i])
 		}
 		for i := 0; i < len(input.tetangga); i++ {
 			newDepth := depth - 1
@@ -30,15 +34,22 @@ func BuatGraf(input *Node, depth int) { // root = depth 0
 }
 
 func DLS(input Node, target string, jumlahArtikel *int, rute *[]string, depth int) bool {
+	*rute = append(*rute, input.nilai)
+	// log.Printf(input.nilai)
+	// log.Printf("DLS ke-%d", depth)
 	if input.nilai == target {
+		// log.Printf("DLS %d", len(*rute))
+		// for i := 0; i < len(*rute); i++ {
+		// 	log.Printf("rute %d %s", i+1, (*rute)[i])
+		// }
 		return true
 	} else {
 		*jumlahArtikel++
 		if depth == 0 {
+			*rute = (*rute)[:len(*rute)-1]
 			return false
 		} else {
 			for i := 0; i < len(input.tetangga); i++ {
-				*rute = append(*rute, input.nilai)
 				if DLS(*input.tetangga[i], target, jumlahArtikel, rute, depth-1) {
 					return true
 				}
@@ -50,14 +61,13 @@ func DLS(input Node, target string, jumlahArtikel *int, rute *[]string, depth in
 }
 
 func SearchIDS(input string, target string, jumlahArtikel *int, rute *[]string) {
-	graf := &Node{
-		nilai: input,
-	}
 	depth := 0
 	for {
+		graf := &Node{
+			nilai: input,
+		}
 		BuatGraf(graf, depth)
-		hasil := []string{""}
-		if DLS(*graf, target, jumlahArtikel, &hasil, depth) {
+		if DLS(*graf, target, jumlahArtikel, rute, depth) {
 			break
 		} else {
 			depth += 1

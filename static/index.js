@@ -2,7 +2,8 @@ function $(id) {
 	return document.getElementById(id);
 }
 
-const ws = new WebSocket("/api")
+const host = new URL(document.URL).host
+const ws = new WebSocket("ws://" + host + "/api")
 const state = {
 	running: false,
 }

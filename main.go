@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	"encoding/json"
-	"io/fs"
 	"log"
 	"net/http"
 
@@ -127,8 +126,8 @@ func main() {
 		}
 	})
 
-	content, _ := fs.Sub(static, "static")
-	http.Handle("/", http.FileServer(http.FS(content)))
+	// content, _ := fs.Sub(static, "static")
+	http.Handle("/", http.FileServer(http.Dir("static")))
 	log.Println("Listening on port 3000")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {

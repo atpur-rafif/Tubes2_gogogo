@@ -17,15 +17,6 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// func main() {
-// 	forceQuit := make(chan bool)
-// 	responses := make(chan Response)
-// 	go SearchBFS("Highway", "Traffic", responses, forceQuit)
-// 	for response := range responses {
-// 		log.Println(response.Message)
-// 	}
-// }
-
 //go:embed static/*
 var static embed.FS
 
@@ -116,7 +107,7 @@ func main() {
 					if req.Type == "BFS" {
 						fn = SearchBFS
 					} else if req.Type == "IDS" {
-						log.Panic("Invalid method")
+						fn = SearchIDS
 					} else {
 						log.Panic("Invalid method")
 					}

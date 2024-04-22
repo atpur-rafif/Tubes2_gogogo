@@ -31,7 +31,7 @@ func scrap(urlStr string) []string {
 		return result
 	}
 
-	log.Println("[Scrapper] Visiting  " + urlStr)
+	// log.Println("[Scrapper] Visiting  " + urlStr)
 	response, err := http.Get(urlStr)
 	if err != nil {
 		log.Println("Can't visit URL " + urlStr)
@@ -82,7 +82,7 @@ func scrap(urlStr string) []string {
 			count += 1
 		}
 	}
-	log.Println("[Scrapper] Links found in "+urlStr+":", len(result))
+	// log.Println("[Scrapper] Links found in "+urlStr+":", len(result))
 
 	return result
 }

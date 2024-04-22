@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-const MAX_CONCURRENT = 10
+const MAX_CONCURRENT = 3
 
 type StateBFS struct {
 	Stack   [][]string
@@ -19,9 +19,9 @@ type Visit struct {
 
 func runStack(state *StateBFS, linksChan chan Visit) {
 	for len((*state).Stack) > 0 && (*state).Running < MAX_CONCURRENT { // kalau stack berisi > 0 dan yg berjalan < 10
-		path := (*state).Stack[0] // path(adalah list) diisi oleh elemen pertama stack
+		path := (*state).Stack[0]           // path(adalah list) diisi oleh elemen pertama stack
 		(*state).Stack = (*state).Stack[1:] // elemen pertama stack dihapus
-		top := path[len(path)-1] // top(adalah string) diisi path
+		top := path[len(path)-1]            // top(adalah string) diisi path
 
 		if (*state).Visited[top] { // kalau udah pernah divisit lanjut
 			continue
@@ -29,7 +29,7 @@ func runStack(state *StateBFS, linksChan chan Visit) {
 		(*state).Visited[top] = true // tandai udah pernah divisit
 
 		(*state).Running += 1 // increment jumlah yg berjalan
-		go func() { // membuat instance visit dari path
+		go func() {           // membuat instance visit dari path
 			linksChan <- Visit{
 				Path: path,
 				Next: getLinks(top),

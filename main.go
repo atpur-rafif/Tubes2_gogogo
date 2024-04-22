@@ -17,33 +17,6 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// func main() {
-// 	start := time.Now()
-
-// 	//something doing here
-
-// 	jumlahArtikel := 0
-// 	rute := []string{}
-
-// 	SearchIDS("Disney", "Hitler", &jumlahArtikel, &rute)
-// 	log.Printf("awal")
-// 	log.Printf("panjang rute %d", len(rute))
-
-// 	log.Printf("jumlah artikel terbaca %d", jumlahArtikel)
-// 	for i := 0; i < len(rute); i++ {
-// 		log.Printf(rute[i])
-// 	}
-// 	log.Printf("akhir")
-// 	end := time.Now()
-// 	fmt.Printf("execution took %s", end.Sub(start))
-// 	// forceQuit := make(chan bool)
-// 	// responses := make(chan Response)
-// 	// go SearchBFS("Highway", "Traffic", responses, forceQuit)
-// 	// for response := range responses {
-// 	// 	log.Println(response.Message)
-// 	// }
-// }
-
 //go:embed static/*
 var static embed.FS
 
@@ -134,7 +107,7 @@ func main() {
 					if req.Type == "BFS" {
 						fn = SearchBFS
 					} else if req.Type == "IDS" {
-						log.Panic("Method not implemented")
+						fn = SearchIDS
 					} else {
 						log.Panic("Invalid method")
 					}

@@ -1,90 +1,136 @@
 package main
 
 import (
+	"log"
+	"strconv"
 	"strings"
 )
 
-const MAX_CONCURRENT = 3
+const MAX_CONCURRENT = 5
+
+const (
+	Unfetched = iota + 1
+	Fetching
+	Fetched
+)
+
+type FetchResult struct {
+	From string
+	To   []string
+}
 
 type StateBFS struct {
-	Stack   [][]string
-	Visited map[string]bool
-	Running int
+	Queue         [][]string
+	Visited       map[string]bool
+	FetchedStatus map[string]bool
+	FetchData     map[string][]string
+	FetchChannel  chan FetchResult
+	FetchedCount  int // Optimization to start searching for unfetched data
+	Running       int
 }
 
-type Visit struct {
-	Path []string
-	Next []string
+func (s *StateBFS) prefetch() {
+	i := s.FetchedCount
+	for i < len(s.Queue) && s.Running < MAX_CONCURRENT {
+		path := s.Queue[i]
+		current := path[len(path)-1]
+
+		if _, found := s.FetchedStatus[current]; !found {
+			s.FetchedStatus[current] = false
+			s.FetchedCount += 1
+			s.Running += 1
+			go func() {
+				s.FetchChannel <- FetchResult{
+					From: current,
+					To:   getLinks(current),
+				}
+			}()
+		}
+
+		i += 1
+	}
 }
 
-func runStack(state *StateBFS, linksChan chan Visit) {
-	for len((*state).Stack) > 0 && (*state).Running < MAX_CONCURRENT { // kalau stack berisi > 0 dan yg berjalan < 10
-		path := (*state).Stack[0]           // path(adalah list) diisi oleh elemen pertama stack
-		(*state).Stack = (*state).Stack[1:] // elemen pertama stack dihapus
-		top := path[len(path)-1]            // top(adalah string) diisi path
+func SearchBFS(start, end string, responseChan chan Response, forceQuit chan bool) {
+	s := StateBFS{
+		Queue:         make([][]string, 0),
+		Visited:       make(map[string]bool),
+		FetchedStatus: make(map[string]bool),
+		FetchData:     make(map[string][]string),
+		FetchChannel:  make(chan FetchResult),
+		FetchedCount:  0,
+		Running:       0,
+	}
 
-		if (*state).Visited[top] { // kalau udah pernah divisit lanjut
+	responseChan <- Response{
+		Status:  Started,
+		Message: "Started...",
+	}
+
+	s.Queue = append(s.Queue, []string{start})
+	s.prefetch()
+
+	var resultPath []string
+LO:
+	for {
+		if len(s.Queue) == 0 {
+			log.Println("Path not found")
+			break
+		}
+
+		path := s.Queue[0]
+		s.Queue = s.Queue[1:]
+		current := path[len(path)-1]
+		s.FetchedCount -= 1
+		if s.Visited[current] {
 			continue
 		}
-		(*state).Visited[top] = true // tandai udah pernah divisit
+		s.Visited[current] = true
 
-		(*state).Running += 1 // increment jumlah yg berjalan
-		go func() {           // membuat instance visit dari path
-			linksChan <- Visit{
-				Path: path,
-				Next: getLinks(top),
-			}
-		}()
-	}
-}
-
-func SearchBFS(start, end string, channel chan Response, forceQuit chan bool) {
-	var resultPath []string
-	state := StateBFS{
-		Stack:   make([][]string, 0),
-		Visited: make(map[string]bool),
-		Running: 0,
-	}
-	state.Stack = append(state.Stack, []string{start})
-
-	visitChan := make(chan Visit)
-	runStack(&state, visitChan)
-
-	channel <- Response{
-		Status:  Started,
-		Message: "From " + start + " to " + end,
-	}
-
-L:
-	for {
-		select {
-		case <-forceQuit:
-			return
-		case visit := <-visitChan:
-			for _, next := range visit.Next {
-				newPath := make([]string, len(visit.Path))
-				copy(newPath, visit.Path)
-				newPath = append(newPath, next)
-				state.Stack = append(state.Stack, newPath)
-
-				if next == end {
-					resultPath = newPath
-					break L
-				}
+		for {
+			if fetched, found := s.FetchedStatus[current]; found && fetched == true {
+				break
 			}
 
-			channel <- Response{
-				Status:  Update,
-				Message: "Visited " + visit.Path[len(visit.Path)-1],
+			select {
+			case <-forceQuit:
+				return
+			case result := <-s.FetchChannel:
+				from := result.From
+				s.FetchData[from] = result.To
+				s.FetchedStatus[from] = true
+				s.Running -= 1
+				s.prefetch()
 			}
-
-			state.Running -= 1
-			runStack(&state, visitChan)
 		}
+
+		responseChan <- Response{
+			Status:  Update,
+			Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)),
+		}
+
+		localLink := make(map[string]bool)
+		for _, to := range s.FetchData[current] {
+			if s.Visited[to] || localLink[to] {
+				continue
+			}
+			localLink[to] = true
+
+			newPath := make([]string, len(path))
+			copy(newPath, path)
+			newPath = append(newPath, to)
+			s.Queue = append(s.Queue, newPath)
+
+			if end == to {
+				resultPath = newPath
+				break LO
+			}
+		}
+		s.prefetch()
 	}
 
-	channel <- Response{
+	responseChan <- Response{
 		Status:  Finished,
-		Message: strings.Join(resultPath, " ➡️ "),
+		Message: strings.Join(resultPath, " ➡️  "),
 	}
 }

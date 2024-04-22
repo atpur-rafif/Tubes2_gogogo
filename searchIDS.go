@@ -94,7 +94,7 @@ func recurDLS(s *StateDLS, responseChan chan Response, branchChan chan BranchDLS
 			s.Global.StateIDS.ResultPaths = append(s.Global.StateIDS.ResultPaths, s.Path)
 			responseChan <- Response{
 				Status:  Finished,
-				Message: strings.Join(s.Path, " ➡️ "),
+				Message: strings.Join(s.Path, " ➡️  "),
 			}
 			go func() {
 				forceQuit <- true

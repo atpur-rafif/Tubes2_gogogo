@@ -46,9 +46,9 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 	current := s.Path[len(s.Path)-1]
 	log.Println(s.Path)
 
-	if s.Visited[current] {
-		return
-	}
+	// if s.Visited[current] {
+	// 	return
+	// }
 	s.Visited[current] = true
 
 	if depth == s.MaxDepth {
@@ -67,9 +67,9 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 		}
 
 		for _, next := range s.FetchedData[current] {
-			if s.Visited[next] {
-				continue
-			}
+			// if s.Visited[next] {
+			// 	continue
+			// }
 
 			if _, found := s.FetchedData[next]; !found {
 				s.NextFetch = append(s.NextFetch, next)
@@ -82,9 +82,9 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 		}
 	} else {
 		for _, next := range s.FetchedData[current] {
-			if s.Visited[next] {
-				continue
-			}
+			// if s.Visited[next] {
+			// 	continue
+			// }
 
 			s.Path = append(s.Path, next)
 			traverserIDS(s, responseChan, forceQuit)

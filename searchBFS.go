@@ -6,13 +6,7 @@ import (
 	"strings"
 )
 
-const MAX_CONCURRENT = 5
-
-const (
-	Unfetched = iota + 1
-	Fetching
-	Fetched
-)
+const MAX_CONCURRENT = 10
 
 type FetchResult struct {
 	From string
@@ -35,9 +29,7 @@ func (s *StateBFS) prefetch() {
 		path := s.Queue[i]
 		current := path[len(path)-1]
 
-		if _, found := s.FetchedStatus[current]; !found {
-			s.FetchedStatus[current] = false
-			s.FetchedCount += 1
+		if !s.FetchedStatus[current] {
 			s.Running += 1
 			go func() {
 				s.FetchChannel <- FetchResult{
@@ -46,12 +38,18 @@ func (s *StateBFS) prefetch() {
 				}
 			}()
 		}
+		s.FetchedCount += 1
 
 		i += 1
 	}
 }
 
 func SearchBFS(start, end string, responseChan chan Response, forceQuit chan bool) {
+	responseChan <- Response{
+		Status:  Started,
+		Message: "Started...",
+	}
+
 	s := StateBFS{
 		Queue:         make([][]string, 0),
 		Visited:       make(map[string]bool),
@@ -60,11 +58,6 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 		FetchChannel:  make(chan FetchResult),
 		FetchedCount:  0,
 		Running:       0,
-	}
-
-	responseChan <- Response{
-		Status:  Started,
-		Message: "Started...",
 	}
 
 	s.Queue = append(s.Queue, []string{start})
@@ -88,7 +81,7 @@ LO:
 		s.Visited[current] = true
 
 		for {
-			if fetched, found := s.FetchedStatus[current]; found && fetched == true {
+			if s.FetchedStatus[current] {
 				break
 			}
 
@@ -106,7 +99,7 @@ LO:
 
 		responseChan <- Response{
 			Status:  Update,
-			Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)),
+			Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)-1),
 		}
 
 		localLink := make(map[string]bool)

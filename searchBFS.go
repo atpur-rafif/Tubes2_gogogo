@@ -1,10 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
 
-const MAX_CONCURRENT = 3
+const MAX_CONCURRENT = 5
 
 type StateBFS struct {
 	Stack   [][]string
@@ -39,6 +40,8 @@ func runStack(state *StateBFS, linksChan chan Visit) {
 }
 
 func SearchBFS(start, end string, channel chan Response, forceQuit chan bool) {
+	shortestpath := 0
+	var multiplepath [][]string
 	var resultPath []string
 	state := StateBFS{
 		Stack:   make([][]string, 0),
@@ -67,8 +70,20 @@ L:
 				newPath = append(newPath, next)
 				state.Stack = append(state.Stack, newPath)
 
+				// if next == end {
+				// 	resultPath = newPath
+				// 	break L
+				// }
+
 				if next == end {
 					resultPath = newPath
+					shortestpath = len(newPath)
+					multiplepath = append(multiplepath, resultPath)
+					fmt.Println("Banyak solusi: ")
+					fmt.Println(len(multiplepath))
+				}
+
+				if len(newPath) > shortestpath && len(multiplepath) > 0 {
 					break L
 				}
 			}

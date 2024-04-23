@@ -1,166 +1,121 @@
 package main
 
-import (
-	"strconv"
-	"strings"
-)
+import "log"
 
 type StateIDS struct {
 	Start string
 	End   string
 
-	FetchData     map[string][]string
-	FetchedStatus map[string]bool
-	Visited       map[string]bool
+	Path    []string
+	Visited map[string]bool
 
+	FetchedData  map[string][]string
 	FetchChannel chan FetchResult
-	AckChannel   chan bool // Acknowledgement channel when traverse thread accept new fetch data
+	CurrentFetch []string
+	NextFetch    []string
 
-	PrefetcherPath []string
-	TraverserPath  []string
-
-	TargetDepth int
-	Running     int // Only use this variable on prefetcher thread to avoid race condition
-
-	ResultPath []string
-	ForceQuit  bool
+	MaxDepth int
 }
 
-// TODO: Fix bug Hitler -> Traffic
 func prefetcherIDS(s *StateIDS) {
-	if s.ForceQuit || s.ResultPath != nil {
-		return
-	}
-
-	depth := len(s.PrefetcherPath) - 1
-	current := s.PrefetcherPath[depth]
-	if depth == s.TargetDepth {
-		if s.FetchedStatus[current] {
-			return
+	i := 0
+	running := 0
+	finishedChan := make(chan bool)
+	for i < len(s.CurrentFetch) {
+		if running >= MAX_CONCURRENT {
+			<-finishedChan
+			running -= 1
 		}
 
-		for s.Running >= MAX_CONCURRENT {
-			<-s.AckChannel
-			s.Running -= 1
-		}
-
-		s.Running += 1
+		current := s.CurrentFetch[i]
+		running += 1
 		go func() {
 			s.FetchChannel <- FetchResult{
 				From: current,
 				To:   getLinks(current),
 			}
+			finishedChan <- true
 		}()
-	} else {
-		if !s.FetchedStatus[current] {
-			panic("IDS should cached non leaf node, start calling this function from depth zero")
-		}
 
-		for _, next := range s.FetchData[current] {
-			s.PrefetcherPath = append(s.PrefetcherPath, next)
-			prefetcherIDS(s)
-			s.PrefetcherPath = s.PrefetcherPath[:len(s.PrefetcherPath)-1]
-		}
+		i += 1
 	}
 }
 
 func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) {
-	if s.ForceQuit || s.ResultPath != nil {
-		return
-	}
+	depth := len(s.Path) - 1
+	current := s.Path[len(s.Path)-1]
+	log.Println(s.Path)
 
-	depth := len(s.TraverserPath) - 1
-	current := s.TraverserPath[depth]
 	if s.Visited[current] {
 		return
 	}
 	s.Visited[current] = true
 
-	responseChan <- Response{
-		Status:  Update,
-		Message: "Visited " + current + " with depth " + strconv.Itoa(depth),
-	}
-
-	if depth == s.TargetDepth {
+	if depth == s.MaxDepth {
 		for {
-			if s.FetchedStatus[current] {
+			if _, found := s.FetchedData[current]; found {
 				break
 			}
 
 			select {
 			case <-forceQuit:
-				s.ForceQuit = true
 				return
 			case result := <-s.FetchChannel:
 				from := result.From
-				s.FetchData[from] = result.To
-				s.FetchedStatus[from] = true
-				s.AckChannel <- true
+				s.FetchedData[from] = result.To
 			}
 		}
 
-		for _, next := range s.FetchData[current] {
-			if next == s.End {
-				s.ResultPath = s.TraverserPath
-				s.ResultPath = append(s.TraverserPath, next)
-			}
-		}
-
-	} else {
-		if !s.FetchedStatus[current] {
-			panic("IDS should cached non leaf node, start calling this function from depth zero")
-		}
-
-		localVisited := make(map[string]bool)
-		for _, next := range s.FetchData[current] {
-			if s.Visited[next] || localVisited[next] {
+		for _, next := range s.FetchedData[current] {
+			if s.Visited[next] {
 				continue
 			}
 
-			localVisited[next] = true
-			s.TraverserPath = append(s.TraverserPath, next)
+			if _, found := s.FetchedData[next]; !found {
+				s.NextFetch = append(s.NextFetch, next)
+			}
+
+			if next == s.End {
+				log.Println(s.Path, next)
+				panic("FOUND")
+			}
+		}
+	} else {
+		for _, next := range s.FetchedData[current] {
+			if s.Visited[next] {
+				continue
+			}
+
+			s.Path = append(s.Path, next)
 			traverserIDS(s, responseChan, forceQuit)
-			s.TraverserPath = s.TraverserPath[:len(s.TraverserPath)-1]
+			s.Path = s.Path[:len(s.Path)-1]
 		}
 	}
 }
 
 func SearchIDS(start, end string, responseChan chan Response, forceQuit chan bool) {
-	responseChan <- Response{
-		Status:  Started,
-		Message: "Started...",
-	}
-
 	s := StateIDS{
-		Start:          start,
-		End:            end,
-		FetchData:      make(map[string][]string),
-		FetchedStatus:  make(map[string]bool),
-		Visited:        make(map[string]bool),
-		FetchChannel:   make(chan FetchResult),
-		AckChannel:     make(chan bool),
-		PrefetcherPath: []string{start},
-		TraverserPath:  []string{start},
-		TargetDepth:    0,
-		ResultPath:     nil,
-		Running:        0,
+		Start:        start,
+		End:          end,
+		Path:         make([]string, 0),
+		Visited:      make(map[string]bool),
+		FetchedData:  make(map[string][]string),
+		FetchChannel: make(chan FetchResult),
+		CurrentFetch: make([]string, 0),
+		NextFetch:    make([]string, 0),
+		MaxDepth:     0,
 	}
 
-	for s.ResultPath == nil {
+	s.Path = append(s.Path, s.Start)
+	s.NextFetch = append(s.NextFetch, s.Start)
+
+	for i := 0; i < 10; i += 1 {
+		s.CurrentFetch = s.NextFetch
+		s.NextFetch = make([]string, 0)
 		s.Visited = make(map[string]bool)
-		go func() {
-			prefetcherIDS(&s)
-			for s.Running > 0 {
-				<-s.AckChannel
-				s.Running -= 1
-			}
-		}()
+		go prefetcherIDS(&s)
 		traverserIDS(&s, responseChan, forceQuit)
-		s.TargetDepth += 1
-	}
-
-	responseChan <- Response{
-		Status:  Finished,
-		Message: strings.Join(s.ResultPath, " ➡️  "),
+		log.Println("Finished depth", s.MaxDepth)
+		s.MaxDepth += 1
 	}
 }

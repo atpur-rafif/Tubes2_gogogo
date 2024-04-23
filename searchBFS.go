@@ -14,13 +14,12 @@ type FetchResult struct {
 }
 
 type StateBFS struct {
-	Queue         [][]string
-	Visited       map[string]bool
-	FetchedStatus map[string]bool
-	FetchData     map[string][]string
-	FetchChannel  chan FetchResult
-	FetchedCount  int // Optimization to start searching for unfetched data
-	Running       int
+	Queue        [][]string
+	Visited      map[string]bool
+	FetchedCount int // Optimization to start searching for unfetched data
+	FetchedData  map[string][]string
+	FetchChannel chan FetchResult
+	Running      int
 }
 
 func (s *StateBFS) prefetch() {
@@ -29,7 +28,7 @@ func (s *StateBFS) prefetch() {
 		path := s.Queue[i]
 		current := path[len(path)-1]
 
-		if !s.FetchedStatus[current] {
+		if _, found := s.FetchedData[current]; !found {
 			s.Running += 1
 			go func() {
 				s.FetchChannel <- FetchResult{
@@ -51,13 +50,12 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 	}
 
 	s := StateBFS{
-		Queue:         make([][]string, 0),
-		Visited:       make(map[string]bool),
-		FetchedStatus: make(map[string]bool),
-		FetchData:     make(map[string][]string),
-		FetchChannel:  make(chan FetchResult),
-		FetchedCount:  0,
-		Running:       0,
+		Queue:        make([][]string, 0),
+		Visited:      make(map[string]bool),
+		FetchedData:  make(map[string][]string),
+		FetchChannel: make(chan FetchResult),
+		FetchedCount: 0,
+		Running:      0,
 	}
 
 	s.Queue = append(s.Queue, []string{start})
@@ -78,10 +76,10 @@ LO:
 		if s.Visited[current] {
 			continue
 		}
-		s.Visited[current] = true
 
 		for {
-			if s.FetchedStatus[current] {
+			if _, found := s.FetchedData[current]; found {
+				s.Visited[current] = true
 				break
 			}
 
@@ -90,8 +88,7 @@ LO:
 				return
 			case result := <-s.FetchChannel:
 				from := result.From
-				s.FetchData[from] = result.To
-				s.FetchedStatus[from] = true
+				s.FetchedData[from] = result.To
 				s.Running -= 1
 				s.prefetch()
 			}
@@ -102,12 +99,10 @@ LO:
 			Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)-1),
 		}
 
-		localLink := make(map[string]bool)
-		for _, to := range s.FetchData[current] {
-			if s.Visited[to] || localLink[to] {
+		for _, to := range s.FetchedData[current] {
+			if s.Visited[to] {
 				continue
 			}
-			localLink[to] = true
 
 			newPath := make([]string, len(path))
 			copy(newPath, path)

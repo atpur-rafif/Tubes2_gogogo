@@ -59,8 +59,8 @@ func getLinks(page string) (string, Pages) {
 	P := make(map[string][]string)
 	P["Adolf_Hitler"] = []string{"B_"}
 	P["Hitler"] = []string{"B_"}
-	P["B"] = []string{"C", "Hitler"}
-	P["B_"] = []string{"C", "Hitler"}
+	P["B"] = []string{"C", "Hitler", "D"}
+	P["B_"] = []string{"C", "Hitler", "D"}
 	P["C"] = []string{"D", "B_"}
 	P["D"] = []string{"E", "B"}
 	P["E"] = []string{"Traffic"}

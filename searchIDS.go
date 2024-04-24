@@ -1,16 +1,16 @@
 package main
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 type StateIDS struct {
-	Start      string
-	End        string
-	ResultPath []string
+	Start        string
+	End          string
+	CanonicalEnd string
+	ResultPath   []string
 
 	Path      []string
 	Visited   map[string]bool
@@ -73,30 +73,37 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 	depth := len(s.Path) - 1
 	current := s.Path[depth]
 
-	if s.Visited[current] {
-		return
-	}
-
 	if canonical, found := s.Canonical[current]; found {
-		if s.Visited[canonical] {
-			return
-		}
 		current = canonical
-		s.Path[depth] = canonical
-		s.Visited[canonical] = true
 	}
+	// if s.Visited[current] {
+	// 	return
+	// }
+	s.Path[depth] = current
 	s.Visited[current] = true
 
 	if depth == s.MaxDepth {
 		for {
 			if pages, found := s.FetchedData[current]; found {
+				s.Path[depth] = current
+				s.Visited[current] = true
+
 				responseChan <- Response{
 					Status:  Update,
 					Message: "Visited " + current + " with depth " + strconv.Itoa(depth),
 				}
 
+				if current == s.CanonicalEnd {
+					s.ResultPath = s.Path
+
+					s.ForceQuitFetchMutex.Lock()
+					s.ForceQuitFetch = true
+					s.ForceQuitFetchMutex.Unlock()
+					return
+				}
+
 				for _, next := range pages {
-					if next == s.End {
+					if next == s.CanonicalEnd {
 						s.ResultPath = make([]string, len(s.Path))
 						copy(s.ResultPath, s.Path)
 						s.ResultPath = append(s.ResultPath, next)
@@ -104,6 +111,7 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 						s.ForceQuitFetchMutex.Lock()
 						s.ForceQuitFetch = true
 						s.ForceQuitFetchMutex.Unlock()
+						return
 					}
 
 					s.NextFetch = append(s.NextFetch, next)
@@ -160,6 +168,8 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	s.Path = append(s.Path, s.Start)
 	s.NextFetch = append(s.NextFetch, s.Start)
+	canonicalEnd, _ := getLinks(end)
+	s.CanonicalEnd = canonicalEnd
 
 	for s.ResultPath == nil {
 		s.CurrentFetch = make([]string, 0)
@@ -177,7 +187,6 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 			return
 		}
 
-		log.Println("Finished iteration", s.MaxDepth)
 		s.MaxDepth += 1
 	}
 

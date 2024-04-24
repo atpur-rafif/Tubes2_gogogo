@@ -25,12 +25,15 @@ type StateBFS struct {
 }
 
 func (s *StateBFS) prefetch() {
-	i := s.FetchedCount
-	for i < len(s.Queue) && s.Running < MAX_CONCURRENT {
-		path := s.Queue[i]
+	for s.FetchedCount < len(s.Queue) {
+		path := s.Queue[s.FetchedCount]
 		current := path[len(path)-1]
 
 		if _, found := s.FetchedData[current]; !found {
+			if s.Running >= MAX_CONCURRENT {
+				break
+			}
+
 			s.Running += 1
 			go func() {
 				canonical, pages := getLinks(current)
@@ -42,8 +45,6 @@ func (s *StateBFS) prefetch() {
 			}()
 		}
 		s.FetchedCount += 1
-
-		i += 1
 	}
 }
 
@@ -54,7 +55,6 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 	}
 
 	canonicalEnd, _ := getLinks(end)
-	log.Println(canonicalEnd)
 
 	s := StateBFS{
 		Queue:        make([][]string, 0),
@@ -83,23 +83,26 @@ LO:
 		current := path[depth]
 		s.FetchedCount -= 1
 
+		if canonical, found := s.Canonical[current]; found {
+			current = canonical
+		}
 		if s.Visited[current] {
 			continue
 		}
+		path[depth] = current
+		s.Visited[current] = true
 
 		for {
 			if _, found := s.FetchedData[current]; found {
+				path[depth] = current
+				s.Visited[current] = true
+
 				responseChan <- Response{
 					Status:  Update,
 					Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)-1),
 				}
 
-				canonical := s.Canonical[current]
-				s.Visited[current] = true
-				s.Visited[canonical] = true
-
-				path[depth] = canonical
-				if s.Canonical[current] == canonicalEnd {
+				if current == canonicalEnd {
 					resultPath = path
 					break LO
 				}
@@ -125,12 +128,14 @@ LO:
 				return
 			case r := <-s.FetchChannel:
 				s.Canonical[r.From] = r.Canonical
-
-				s.FetchedData[r.From] = r.To
 				s.FetchedData[r.Canonical] = r.To
 
 				s.Running -= 1
 				s.prefetch()
+
+				if current == r.From {
+					current = r.Canonical
+				}
 			}
 		}
 	}

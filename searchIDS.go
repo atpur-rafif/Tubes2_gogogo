@@ -100,7 +100,6 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 			case r := <-s.FetchChannel:
 				s.FetchedData[r.From] = r.To
 			}
-
 		}
 	} else {
 		if pages, found := s.FetchedData[current]; found {

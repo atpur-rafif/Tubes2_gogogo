@@ -73,13 +73,9 @@ LO:
 		s.Queue = s.Queue[1:]
 		current := path[len(path)-1]
 		s.FetchedCount -= 1
-		if s.Visited[current] {
-			continue
-		}
 
 		for {
 			if _, found := s.FetchedData[current]; found {
-				s.Visited[current] = true
 				break
 			}
 
@@ -100,10 +96,6 @@ LO:
 		}
 
 		for _, to := range s.FetchedData[current] {
-			if s.Visited[to] {
-				continue
-			}
-
 			newPath := make([]string, len(path))
 			copy(newPath, path)
 			newPath = append(newPath, to)

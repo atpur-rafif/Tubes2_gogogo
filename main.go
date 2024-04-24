@@ -20,6 +20,19 @@ var upgrader = websocket.Upgrader{
 //go:embed static/*
 var static embed.FS
 
+// func main() {
+// 	forceQuit := make(chan bool)
+// 	responses := make(chan Response)
+// 	go func() {
+// 		SearchBFS("Adolf_Hitler", "Traffic", responses, forceQuit)
+// 		// SearchIDS("Highway", "Traffic", responses, forceQuit)
+// 	}()
+// 	for res := range responses {
+// 		// _ = res
+// 		log.Println(res)
+// 	}
+// }
+
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)

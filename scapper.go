@@ -60,15 +60,25 @@ func scrap(urlStr string) (string, []string) {
 		}
 
 		if bytes.Equal(name, []byte("link")) {
+			isCanonical := false
+			var href []byte
 			for {
 				key, value, next := tokenizer.TagAttr()
-				if bytes.Equal(key, []byte("canonical")) {
-					canonical = string(value)
+				if bytes.Equal(key, []byte("rel")) && bytes.Equal(value, []byte("canonical")) {
+					isCanonical = true
+				}
+
+				if bytes.Equal(key, []byte("href")) {
+					href = value
 				}
 
 				if !next {
 					break
 				}
+			}
+
+			if isCanonical {
+				canonical = string(href)
 			}
 		}
 

@@ -54,6 +54,7 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 	}
 
 	canonicalEnd, _ := getLinks(end)
+	log.Println(canonicalEnd)
 
 	s := StateBFS{
 		Queue:        make([][]string, 0),

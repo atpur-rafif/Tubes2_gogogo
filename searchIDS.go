@@ -1,152 +1,162 @@
 package main
 
 import (
+	"strconv"
 	"strings"
+	"sync"
 )
 
 type StateIDS struct {
-	Pages       map[string][]string
-	Start       string
-	End         string
-	ForceQuit   bool
-	ResultPaths [][]string
+	Start      string
+	End        string
+	ResultPath []string
+
+	Path    []string
+	Visited map[string]bool
+
+	FetchedData  map[string][]string
+	FetchChannel chan FetchResult
+	CurrentFetch []string
+	NextFetch    []string
+
+	ForceQuit           bool
+	ForceQuitFetch      bool
+	ForceQuitFetchMutex sync.Mutex
+
+	MaxDepth int
 }
 
-// Only one data accross thread, and access this data only on main thread to avoid data race
-type GlobalStateDLS struct {
-	Running   int
-	MaxDepth  int
-	PathFound bool
-	Visited   map[string]bool
-	StateIDS  *StateIDS
-}
-
-// Create one every branching happen
-type StateDLS struct {
-	Path   []string
-	Global *GlobalStateDLS
-}
-
-// Save current StateDLS to defer processing until fetch finished
-type BranchDLS struct {
-	Path []string
-	Next []string
-}
-
-func DLS(stateIDS *StateIDS, maxDepth int, responseChan chan Response, forceQuit chan bool) bool {
-	global := GlobalStateDLS{
-		Running:   0,
-		PathFound: false,
-		MaxDepth:  maxDepth,
-		StateIDS:  stateIDS,
-		Visited:   make(map[string]bool),
-	}
-
-	startState := StateDLS{
-		Path:   []string{stateIDS.Start},
-		Global: &global,
-	}
-
-	branchChan := make(chan BranchDLS)
-	recurDLS(&startState, responseChan, branchChan, forceQuit)
-	for global.Running != 0 {
-		waitBranch(&global, responseChan, branchChan, forceQuit)
-	}
-
-	return global.PathFound
-}
-
-func branching(s *StateDLS, _ chan Response, branchChan chan BranchDLS, _ chan bool) {
-	copyPath := make([]string, len(s.Path))
-	copy(copyPath, s.Path)
-	s.Global.Running += 1
-	go func() {
-		current := copyPath[len(copyPath)-1]
-		branchChan <- BranchDLS{
-			Path: copyPath,
-			Next: getLinks(current),
+func prefetcherIDS(s *StateIDS) {
+	i := 0
+	running := 0
+	finishedChan := make(chan bool)
+	for i < len(s.CurrentFetch) {
+		s.ForceQuitFetchMutex.Lock()
+		if s.ForceQuitFetch {
+			return
 		}
-	}()
-}
+		s.ForceQuitFetchMutex.Unlock()
 
-func waitBranch(s *GlobalStateDLS, responseChan chan Response, branchChan chan BranchDLS, forceQuit chan bool) {
-	select {
-	case b := <-branchChan:
-		s.Running -= 1
-		current := b.Path[len(b.Path)-1]
-		stateDLS := StateDLS{
-			Path:   b.Path,
-			Global: s,
+		current := s.CurrentFetch[i]
+		if running >= MAX_CONCURRENT {
+			<-finishedChan
+			running -= 1
 		}
-		s.StateIDS.Pages[current] = b.Next
-		recurDLS(&stateDLS, responseChan, branchChan, forceQuit)
-	case <-forceQuit:
-		s.StateIDS.ForceQuit = true
-	}
-}
 
-func recurDLS(s *StateDLS, responseChan chan Response, branchChan chan BranchDLS, forceQuit chan bool) {
-	current := s.Path[len(s.Path)-1]
-
-	if len(s.Path) == s.Global.MaxDepth+1 {
-		if current == s.Global.StateIDS.End {
-			s.Global.PathFound = true
-			s.Global.StateIDS.ResultPaths = append(s.Global.StateIDS.ResultPaths, s.Path)
-			responseChan <- Response{
-				Status:  Finished,
-				Message: strings.Join(s.Path, " ➡️ "),
+		running += 1
+		go func() {
+			s.FetchChannel <- FetchResult{
+				From: current,
+				To:   getLinks(current),
 			}
-			go func() {
-				forceQuit <- true
-			}()
-		}
+			finishedChan <- true
+		}()
+
+		i += 1
+	}
+
+	for running > 0 {
+		<-finishedChan
+		running -= 1
+	}
+}
+
+func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) {
+	if s.ForceQuit || s.ResultPath != nil {
 		return
 	}
 
-	// Page already fetched
-	if pages, found := s.Global.StateIDS.Pages[current]; found {
-		if !s.Global.StateIDS.ForceQuit {
-			responseChan <- Response{
-				Status:  Update,
-				Message: "Visited " + current,
+	depth := len(s.Path) - 1
+	current := s.Path[depth]
+
+	if depth == s.MaxDepth {
+		for {
+			if pages, found := s.FetchedData[current]; found {
+				responseChan <- Response{
+					Status:  Update,
+					Message: "Visited " + current + " with depth " + strconv.Itoa(depth),
+				}
+
+				for _, next := range pages {
+					if next == s.End {
+						s.ResultPath = s.Path
+						s.ResultPath = append(s.ResultPath, next)
+
+						s.ForceQuitFetchMutex.Lock()
+						s.ForceQuitFetch = true
+						s.ForceQuitFetchMutex.Unlock()
+					}
+
+					s.NextFetch = append(s.NextFetch, next)
+				}
+
+				break
 			}
-		}
 
-		s.Global.Visited[current] = true
-		nextIterated := make(map[string]bool)
-		for _, next := range pages {
-			if s.Global.Visited[next] || nextIterated[next] {
-				continue
+			select {
+			case <-forceQuit:
+				s.ForceQuit = true
+				return
+			case r := <-s.FetchChannel:
+				s.FetchedData[r.From] = r.To
 			}
 
-			nextIterated[next] = true
-			s.Path = append(s.Path, next)
-			recurDLS(s, responseChan, branchChan, forceQuit)
-			s.Path = s.Path[:len(s.Path)-1]
 		}
-		return
+	} else {
+		if pages, found := s.FetchedData[current]; found {
+			for _, next := range pages {
+				s.Path = append(s.Path, next)
+				traverserIDS(s, responseChan, forceQuit)
+				s.Path = s.Path[:len(s.Path)-1]
+			}
+		} else {
+			panic("Non-leaf node should be cached in previous iteration, call this function from depth 0")
+		}
 	}
-
-	for s.Global.Running >= MAX_CONCURRENT {
-		waitBranch(s.Global, responseChan, branchChan, forceQuit)
-	}
-
-	if s.Global.StateIDS.ForceQuit {
-		return
-	}
-	branching(s, responseChan, branchChan, forceQuit)
 }
 
 func SearchIDS(start, end string, responseChan chan Response, forceQuit chan bool) {
-	stateIDS := StateIDS{
-		ForceQuit: false,
-		Pages:     make(map[string][]string, 0),
-		Start:     start,
-		End:       end,
+	responseChan <- Response{
+		Status:  Started,
+		Message: "Started...",
 	}
 
-	depth := 0
-	for !DLS(&stateIDS, depth, responseChan, forceQuit) {
-		depth += 1
+	s := StateIDS{
+		Start:        start,
+		End:          end,
+		ResultPath:   nil,
+		Path:         make([]string, 0),
+		Visited:      make(map[string]bool),
+		FetchedData:  make(map[string][]string),
+		FetchChannel: make(chan FetchResult),
+		CurrentFetch: make([]string, 0),
+		NextFetch:    make([]string, 0),
+		MaxDepth:     0,
+	}
+
+	s.Path = append(s.Path, s.Start)
+	s.NextFetch = append(s.NextFetch, s.Start)
+
+	for s.ResultPath == nil {
+		s.CurrentFetch = make([]string, 0)
+		for _, nextFetch := range s.NextFetch {
+			if _, found := s.FetchedData[nextFetch]; !found {
+				s.CurrentFetch = append(s.CurrentFetch, nextFetch)
+			}
+		}
+
+		s.NextFetch = make([]string, 0)
+		go prefetcherIDS(&s)
+		traverserIDS(&s, responseChan, forceQuit)
+		if s.ForceQuit {
+			return
+		}
+
+		s.MaxDepth += 1
+	}
+
+	responseChan <- Response{
+		Status:  Finished,
+		Message: strings.Join(s.ResultPath, " ➡️  "),
 	}
 }

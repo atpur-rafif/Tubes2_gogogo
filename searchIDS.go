@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,8 +12,9 @@ type StateIDS struct {
 	End        string
 	ResultPath []string
 
-	Path    []string
-	Visited map[string]bool
+	Path      []string
+	Visited   map[string]bool
+	Canonical map[string]string
 
 	FetchedData  map[string][]string
 	FetchChannel chan FetchResult
@@ -71,6 +73,20 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 	depth := len(s.Path) - 1
 	current := s.Path[depth]
 
+	if s.Visited[current] {
+		return
+	}
+
+	if canonical, found := s.Canonical[current]; found {
+		if s.Visited[canonical] {
+			return
+		}
+		current = canonical
+		s.Path[depth] = canonical
+		s.Visited[canonical] = true
+	}
+	s.Visited[current] = true
+
 	if depth == s.MaxDepth {
 		for {
 			if pages, found := s.FetchedData[current]; found {
@@ -81,7 +97,8 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 
 				for _, next := range pages {
 					if next == s.End {
-						s.ResultPath = s.Path
+						s.ResultPath = make([]string, len(s.Path))
+						copy(s.ResultPath, s.Path)
 						s.ResultPath = append(s.ResultPath, next)
 
 						s.ForceQuitFetchMutex.Lock()
@@ -100,7 +117,12 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 				s.ForceQuit = true
 				return
 			case r := <-s.FetchChannel:
-				s.FetchedData[r.From] = r.To
+				s.FetchedData[r.Canonical] = r.To
+				s.Canonical[r.From] = r.Canonical
+
+				if r.From == current {
+					current = r.Canonical
+				}
 			}
 		}
 	} else {
@@ -128,6 +150,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		ResultPath:   nil,
 		Path:         make([]string, 0),
 		Visited:      make(map[string]bool),
+		Canonical:    make(map[string]string),
 		FetchedData:  make(map[string][]string),
 		FetchChannel: make(chan FetchResult),
 		CurrentFetch: make([]string, 0),
@@ -147,12 +170,14 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		}
 
 		s.NextFetch = make([]string, 0)
+		s.Visited = make(map[string]bool)
 		go prefetcherIDS(&s)
 		traverserIDS(&s, responseChan, forceQuit)
 		if s.ForceQuit {
 			return
 		}
 
+		log.Println("Finished iteration", s.MaxDepth)
 		s.MaxDepth += 1
 	}
 

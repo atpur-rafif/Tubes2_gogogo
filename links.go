@@ -56,29 +56,33 @@ func filterPages(links []string) Pages {
 }
 
 func getLinks(page string) (string, Pages) {
-	// P := make(map[string][]string)
-	// P["Adolf_Hitler"] = []string{"B"}
-	// P["Hitler"] = []string{"B"}
-	// P["B"] = []string{"C", "Hitler"}
-	// P["C"] = []string{"D"}
-	// P["D"] = []string{"E"}
-	// P["E"] = []string{"Traffic"}
-	//
-	// canon := page
-	// if page == "Hitler" {
-	// 	canon = "Adolf_Hitler"
-	// }
-	// if page == "Traffic_" {
-	// 	canon = "Traffic"
-	// }
-	//
-	// return canon, P[page]
+	P := make(map[string][]string)
+	P["Adolf_Hitler"] = []string{"B_"}
+	P["Hitler"] = []string{"B_"}
+	P["B"] = []string{"C", "Hitler"}
+	P["B_"] = []string{"C", "Hitler"}
+	P["C"] = []string{"D", "B_"}
+	P["D"] = []string{"E", "B"}
+	P["E"] = []string{"Traffic"}
 
-	canonURL, pages := scrap(WIKI + page)
-	canonPage, ok := parsePage(canonURL)
-	if !ok {
-		canonPage = page
+	canon := page
+	if page == "Hitler" {
+		canon = "Adolf_Hitler"
+	}
+	if page == "Traffic_" {
+		canon = "Traffic"
+	}
+	if page == "B_" {
+		canon = "B"
 	}
 
-	return canonPage, filterPages(pages)
+	return canon, P[page]
+
+	// canonURL, pages := scrap(WIKI + page)
+	// canonPage, ok := parsePage(canonURL)
+	// if !ok {
+	// 	canonPage = page
+	// }
+	//
+	// return canonPage, filterPages(pages)
 }

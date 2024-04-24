@@ -24,7 +24,7 @@ func main() {
 	forceQuit := make(chan bool)
 	responses := make(chan Response)
 	go func() {
-		SearchIDS("Adolf_Hitler", "Traffic", responses, forceQuit)
+		SearchBFS("Hitler", "Traffic", responses, forceQuit)
 		// SearchIDS("Highway", "Traffic", responses, forceQuit)
 	}()
 	for res := range responses {

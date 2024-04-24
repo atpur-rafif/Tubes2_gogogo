@@ -45,9 +45,11 @@ func prefetcherIDS(s *StateIDS) {
 
 		running += 1
 		go func() {
+			canon, pages := getLinks(current)
 			s.FetchChannel <- FetchResult{
-				From: current,
-				To:   getLinks(current),
+				From:      current,
+				To:        pages,
+				Canonical: canon,
 			}
 			finishedChan <- true
 		}()

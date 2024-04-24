@@ -4,29 +4,11 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 const WIKI = "https://en.wikipedia.org/wiki/"
 
 type Pages []string
-
-var canonLinks = make(map[string]string)
-var canonLinksMutex sync.Mutex
-
-func getCanon(page string) string {
-	var canon string
-	canonLinksMutex.Lock()
-	canon = canonLinks[page]
-	canonLinksMutex.Unlock()
-	return canon
-}
-
-func setCanon(page, canon string) {
-	canonLinksMutex.Lock()
-	canonLinks[page] = canon
-	canonLinksMutex.Unlock()
-}
 
 func parsePage(to string) (string, bool) {
 	if !strings.HasPrefix(to, WIKI) {
@@ -73,21 +55,30 @@ func filterPages(links []string) Pages {
 	return pages
 }
 
-func getLinks(page string) Pages {
+func getLinks(page string) (string, Pages) {
 	// P := make(map[string][]string)
+	// P["Adolf_Hitler"] = []string{"B"}
 	// P["Hitler"] = []string{"B"}
-	// P["B"] = []string{"C"}
+	// P["B"] = []string{"C", "Hitler"}
 	// P["C"] = []string{"D"}
 	// P["D"] = []string{"E"}
 	// P["E"] = []string{"Traffic"}
-	// return P[page]
+	//
+	// canon := page
+	// if page == "Hitler" {
+	// 	canon = "Adolf_Hitler"
+	// }
+	// if page == "Traffic_" {
+	// 	canon = "Traffic"
+	// }
+	//
+	// return canon, P[page]
 
 	canonURL, pages := scrap(WIKI + page)
 	canonPage, ok := parsePage(canonURL)
 	if !ok {
 		canonPage = page
 	}
-	setCanon(page, canonPage)
 
-	return filterPages(pages)
+	return canonPage, filterPages(pages)
 }

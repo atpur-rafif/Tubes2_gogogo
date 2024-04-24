@@ -38,5 +38,12 @@ func getPages(links []string) Pages {
 
 // TODO: Redirect map
 func getLinks(page string) Pages {
+	// P := make(map[string][]string)
+	// P["Hitler"] = []string{"B"}
+	// P["B"] = []string{"C"}
+	// P["C"] = []string{"D"}
+	// P["D"] = []string{"E"}
+	// P["E"] = []string{"Traffic"}
+	// return P[page]
 	return getPages(scrap(WIKI + page))
 }

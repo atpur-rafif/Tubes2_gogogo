@@ -16,17 +16,21 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+//go:embed static/*
+var static embed.FS
+
 // func main() {
 // 	forceQuit := make(chan bool)
 // 	responses := make(chan Response)
-// 	go SearchBFS("Highway", "Traffic", responses, forceQuit)
-// 	for response := range responses {
-// 		log.Println(response.Message)
+// 	go func() {
+// 		SearchBFS("Adolf_Hitler", "Traffic", responses, forceQuit)
+// 		// SearchIDS("Highway", "Traffic", responses, forceQuit)
+// 	}()
+// 	for res := range responses {
+// 		// _ = res
+// 		log.Println(res)
 // 	}
 // }
-
-//go:embed static/*
-var static embed.FS
 
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +119,7 @@ func main() {
 					if req.Type == "BFS" {
 						fn = SearchBFS
 					} else if req.Type == "IDS" {
-						log.Panic("Invalid method")
+						fn = SearchIDS
 					} else {
 						log.Panic("Invalid method")
 					}

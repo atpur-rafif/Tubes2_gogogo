@@ -7,12 +7,14 @@ import (
 )
 
 type StateIDS struct {
-	Start      string
-	End        string
-	ResultPath []string
+	Start        string
+	End          string
+	CanonicalEnd string
+	ResultPath   []string
 
-	Path    []string
-	Visited map[string]bool
+	Path      []string
+	Visited   map[string]bool
+	Canonical map[string]string
 
 	FetchedData  map[string][]string
 	FetchChannel chan FetchResult
@@ -45,9 +47,11 @@ func prefetcherIDS(s *StateIDS) {
 
 		running += 1
 		go func() {
+			canon, pages := getLinks(current)
 			s.FetchChannel <- FetchResult{
-				From: current,
-				To:   getLinks(current),
+				From:      current,
+				To:        pages,
+				Canonical: canon,
 			}
 			finishedChan <- true
 		}()
@@ -69,22 +73,45 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 	depth := len(s.Path) - 1
 	current := s.Path[depth]
 
+	if canonical, found := s.Canonical[current]; found {
+		current = canonical
+	}
+	// if s.Visited[current] {
+	// 	return
+	// }
+	s.Path[depth] = current
+	s.Visited[current] = true
+
 	if depth == s.MaxDepth {
 		for {
 			if pages, found := s.FetchedData[current]; found {
+				s.Path[depth] = current
+				s.Visited[current] = true
+
 				responseChan <- Response{
 					Status:  Update,
 					Message: "Visited " + current + " with depth " + strconv.Itoa(depth),
 				}
 
+				if current == s.CanonicalEnd {
+					s.ResultPath = s.Path
+
+					s.ForceQuitFetchMutex.Lock()
+					s.ForceQuitFetch = true
+					s.ForceQuitFetchMutex.Unlock()
+					return
+				}
+
 				for _, next := range pages {
-					if next == s.End {
-						s.ResultPath = s.Path
+					if next == s.CanonicalEnd {
+						s.ResultPath = make([]string, len(s.Path))
+						copy(s.ResultPath, s.Path)
 						s.ResultPath = append(s.ResultPath, next)
 
 						s.ForceQuitFetchMutex.Lock()
 						s.ForceQuitFetch = true
 						s.ForceQuitFetchMutex.Unlock()
+						return
 					}
 
 					s.NextFetch = append(s.NextFetch, next)
@@ -98,9 +125,13 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 				s.ForceQuit = true
 				return
 			case r := <-s.FetchChannel:
-				s.FetchedData[r.From] = r.To
-			}
+				s.FetchedData[r.Canonical] = r.To
+				s.Canonical[r.From] = r.Canonical
 
+				if r.From == current {
+					current = r.Canonical
+				}
+			}
 		}
 	} else {
 		if pages, found := s.FetchedData[current]; found {
@@ -127,6 +158,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		ResultPath:   nil,
 		Path:         make([]string, 0),
 		Visited:      make(map[string]bool),
+		Canonical:    make(map[string]string),
 		FetchedData:  make(map[string][]string),
 		FetchChannel: make(chan FetchResult),
 		CurrentFetch: make([]string, 0),
@@ -136,6 +168,8 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	s.Path = append(s.Path, s.Start)
 	s.NextFetch = append(s.NextFetch, s.Start)
+	canonicalEnd, _ := getLinks(end)
+	s.CanonicalEnd = canonicalEnd
 
 	for s.ResultPath == nil {
 		s.CurrentFetch = make([]string, 0)
@@ -146,6 +180,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		}
 
 		s.NextFetch = make([]string, 0)
+		s.Visited = make(map[string]bool)
 		go prefetcherIDS(&s)
 		traverserIDS(&s, responseChan, forceQuit)
 		if s.ForceQuit {

@@ -11,10 +11,9 @@ type StateIDS struct {
 	End          string
 	CanonicalEnd string
 	ResultPath   []string
-
-	Path      []string
-	Visited   map[string]bool
-	Canonical map[string]string
+	Path         []string
+	PathSet      map[string]bool
+	Canonical    map[string]string
 
 	FetchedData  map[string][]string
 	FetchChannel chan FetchResult
@@ -76,17 +75,11 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 	if canonical, found := s.Canonical[current]; found {
 		current = canonical
 	}
-	// if s.Visited[current] {
-	// 	return
-	// }
-	s.Path[depth] = current
-	s.Visited[current] = true
 
 	if depth == s.MaxDepth {
 		for {
 			if pages, found := s.FetchedData[current]; found {
 				s.Path[depth] = current
-				s.Visited[current] = true
 
 				responseChan <- Response{
 					Status:  Update,
@@ -136,8 +129,18 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 	} else {
 		if pages, found := s.FetchedData[current]; found {
 			for _, next := range pages {
+				if canonical, found := s.Canonical[next]; found {
+					next = canonical
+				}
+
+				if s.PathSet[next] {
+					continue
+				}
+
 				s.Path = append(s.Path, next)
+				s.PathSet[next] = true
 				traverserIDS(s, responseChan, forceQuit)
+				delete(s.PathSet, next)
 				s.Path = s.Path[:len(s.Path)-1]
 			}
 		} else {
@@ -157,7 +160,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		End:          end,
 		ResultPath:   nil,
 		Path:         make([]string, 0),
-		Visited:      make(map[string]bool),
+		PathSet:      make(map[string]bool),
 		Canonical:    make(map[string]string),
 		FetchedData:  make(map[string][]string),
 		FetchChannel: make(chan FetchResult),
@@ -180,7 +183,6 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		}
 
 		s.NextFetch = make([]string, 0)
-		s.Visited = make(map[string]bool)
 		go prefetcherIDS(&s)
 		traverserIDS(&s, responseChan, forceQuit)
 		if s.ForceQuit {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,13 +78,13 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 				s.Path[depth] = current
 
 				responseChan <- Response{
-					Status:  Update,
+					Status:  Log,
 					Message: "Visited " + current + " with depth " + strconv.Itoa(depth),
 				}
 
+				var result []string = nil
 				if current == s.CanonicalEnd {
-					s.ResultPaths = append(s.ResultPaths, s.Path)
-					return
+					result = s.Path
 				}
 
 				for _, next := range pages {
@@ -93,11 +92,21 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 						path := make([]string, len(s.Path))
 						copy(path, s.Path)
 						path = append(path, next)
-						s.ResultPaths = append(s.ResultPaths, path)
-						return
+						result = path
+						continue
 					}
 
 					s.NextFetch = append(s.NextFetch, next)
+				}
+
+				if result != nil {
+					responseChan <- Response{
+						Status:  Found,
+						Message: strings.Join(result, " ➡️  "),
+					}
+
+					s.ResultPaths = append(s.ResultPaths, result)
+					return
 				}
 
 				break
@@ -141,7 +150,7 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 
 func SearchIDS(start, end string, responseChan chan Response, forceQuit chan bool) {
 	responseChan <- Response{
-		Status:  Started,
+		Status:  Start,
 		Message: "Started...",
 	}
 
@@ -182,10 +191,8 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		s.MaxDepth += 1
 	}
 
-	log.Println(s.ResultPaths)
-
 	responseChan <- Response{
-		Status:  Finished,
-		Message: strings.Join(s.ResultPaths[0], " ➡️  "),
+		Status: End,
+		// Message: strings.Join(s.ResultPaths[0], " ➡️  "),
 	}
 }

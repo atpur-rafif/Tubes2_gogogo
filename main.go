@@ -3,7 +3,7 @@ package main
 import (
 	"embed"
 	"encoding/json"
-	"io/fs"
+	// "io/fs"
 	"log"
 	"net/http"
 
@@ -20,7 +20,7 @@ var upgrader = websocket.Upgrader{
 //go:embed static/*
 var static embed.FS
 
-func main() {
+func main_old() {
 	forceQuit := make(chan bool)
 	responses := make(chan Response)
 	go func() {
@@ -34,7 +34,7 @@ func main() {
 	}
 }
 
-func main_old() {
+func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -132,8 +132,9 @@ func main_old() {
 		}
 	})
 
-	content, _ := fs.Sub(static, "static")
-	http.Handle("/", http.FileServer(http.FS(content)))
+	// content, _ := fs.Sub(static, "static")
+	http.Handle("/", http.FileServer(http.Dir("static")))
+	// http.Handle("/", http.FileServer(http.FS(content)))
 	log.Println("Listening on port 3000")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {

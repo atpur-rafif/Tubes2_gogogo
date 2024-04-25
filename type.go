@@ -20,9 +20,10 @@ type WikipediaResponse struct {
 }
 
 const (
-	Update = iota + 1
-	Started
-	Finished
+	Log = iota + 1
+	Start
+	Found
+	End
 	Error
 )
 
@@ -42,11 +43,13 @@ type Response struct {
 
 func (s Status) String() string {
 	switch s {
-	case Update:
+	case Log:
 		return "update"
-	case Started:
+	case Start:
 		return "started"
-	case Finished:
+	case Found:
+		return "found"
+	case End:
 		return "finished"
 	default:
 		return "error"

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strconv"
 	"strings"
 )
@@ -29,6 +28,10 @@ type StateBFS struct {
 }
 
 func (s *StateBFS) prefetch() {
+	if s.FetchedCount < 0 {
+		s.FetchedCount = 0
+	}
+
 	for s.FetchedCount < len(s.Queue) {
 		path := s.Queue[s.FetchedCount]
 		current := path[len(path)-1]
@@ -54,7 +57,7 @@ func (s *StateBFS) prefetch() {
 
 func SearchBFS(start, end string, responseChan chan Response, forceQuit chan bool) {
 	responseChan <- Response{
-		Status:  Started,
+		Status:  Start,
 		Message: "Started...",
 	}
 
@@ -77,12 +80,12 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 	s.Queue = append(s.Queue, []string{start})
 	s.prefetch()
 
-	var resultPath []string
 	for {
 		if len(s.Queue) == 0 {
 			break
 		}
 
+		s.prefetch()
 		path := s.Queue[0]
 		s.Queue = s.Queue[1:]
 		depth := len(path) - 1
@@ -108,12 +111,15 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 				s.Visited[current] = true
 
 				responseChan <- Response{
-					Status:  Update,
-					Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)-1),
+					Status: Log,
+					Message: "Visited article count: " + strconv.Itoa(len(s.FetchedData)) +
+						"\nDepth: " + strconv.Itoa(depth) +
+						"\nVisited " + current,
 				}
 
+				var result []string = nil
 				if current == canonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth) {
-					s.ResultPaths = append(s.ResultPaths, path)
+					result = path
 					s.ResultDepth = depth
 				}
 
@@ -123,14 +129,21 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					newPath = append(newPath, next)
 
 					if next == canonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth+1) {
-						s.ResultPaths = append(s.ResultPaths, newPath)
+						result = newPath
 						s.ResultDepth = depth + 1
-						break
+						continue
 					}
 
 					s.Queue = append(s.Queue, newPath)
 				}
-				s.prefetch()
+
+				if result != nil {
+					s.ResultPaths = append(s.ResultPaths, result)
+					responseChan <- Response{
+						Status:  Found,
+						Message: strings.Join(result, " ➡️  "),
+					}
+				}
 
 				break
 			}
@@ -152,10 +165,8 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 		}
 	}
 
-	log.Println(s.ResultPaths)
-
 	responseChan <- Response{
-		Status:  Finished,
-		Message: strings.Join(resultPath, " ➡️  "),
+		Status: End,
+		// Message: strings.Join(resultPath, " ➡️  "),
 	}
 }

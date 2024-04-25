@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	// "time"
 )
 
 const WIKI = "https://en.wikipedia.org/wiki/"
@@ -56,34 +57,35 @@ func filterPages(links []string) Pages {
 }
 
 func getLinks(page string) (string, Pages) {
-	P := make(map[string][]string)
-	P["Adolf_Hitler"] = []string{"B_"}
-	P["Hitler"] = []string{"B_"}
-	P["B"] = []string{"C", "Hitler", "D"}
-	P["B_"] = []string{"C", "Hitler", "D"}
-	P["C"] = []string{"D", "B_"}
-	P["D"] = []string{"E", "B", "F"}
-	P["E"] = []string{"Traffic"}
-	P["F"] = []string{"Traffic"}
-
-	canon := page
-	if page == "Hitler" {
-		canon = "Adolf_Hitler"
-	}
-	if page == "Traffic_" {
-		canon = "Traffic"
-	}
-	if page == "B_" {
-		canon = "B"
-	}
-
-	return canon, P[page]
-
-	// canonURL, pages := scrap(WIKI + page)
-	// canonPage, ok := parsePage(canonURL)
-	// if !ok {
-	// 	canonPage = page
+	// time.Sleep(300 * time.Millisecond)
+	// P := make(map[string][]string)
+	// P["Adolf_Hitler"] = []string{"B_"}
+	// P["Hitler"] = []string{"B_"}
+	// P["B"] = []string{"C", "Hitler", "D"}
+	// P["B_"] = []string{"C", "Hitler", "D"}
+	// P["C"] = []string{"D", "B_"}
+	// P["D"] = []string{"E", "B", "F"}
+	// P["E"] = []string{"Traffic"}
+	// P["F"] = []string{"Traffic"}
+	//
+	// canon := page
+	// if page == "Hitler" {
+	// 	canon = "Adolf_Hitler"
+	// }
+	// if page == "Traffic_" {
+	// 	canon = "Traffic"
+	// }
+	// if page == "B_" {
+	// 	canon = "B"
 	// }
 	//
-	// return canonPage, filterPages(pages)
+	// return canon, P[page]
+
+	canonURL, pages := scrap(WIKI + page)
+	canonPage, ok := parsePage(canonURL)
+	if !ok {
+		canonPage = page
+	}
+
+	return canonPage, filterPages(pages)
 }

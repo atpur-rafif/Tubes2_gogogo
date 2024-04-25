@@ -23,19 +23,21 @@ func toAbsUrl(from, to *url.URL) url.URL {
 	}
 }
 
-func scrap(urlStr string) []string {
+func scrap(urlStr string) (string, []string) {
 	result := make([]string, 0)
 	from, err := url.Parse(urlStr)
+
+	canonical := ""
 	if err != nil {
 		log.Println("Can't parse URL " + urlStr)
-		return result
+		return canonical, result
 	}
 
 	// log.Println("[Scrapper] Visiting  " + urlStr)
 	response, err := http.Get(urlStr)
 	if err != nil {
 		log.Println("Can't visit URL " + urlStr)
-		return result
+		return canonical, result
 	}
 	defer response.Body.Close()
 
@@ -54,6 +56,29 @@ func scrap(urlStr string) []string {
 				insideMain = true
 			} else if token == html.EndTagToken {
 				insideMain = false
+			}
+		}
+
+		if bytes.Equal(name, []byte("link")) {
+			isCanonical := false
+			var href []byte
+			for {
+				key, value, next := tokenizer.TagAttr()
+				if bytes.Equal(key, []byte("rel")) && bytes.Equal(value, []byte("canonical")) {
+					isCanonical = true
+				}
+
+				if bytes.Equal(key, []byte("href")) {
+					href = value
+				}
+
+				if !next {
+					break
+				}
+			}
+
+			if isCanonical {
+				canonical = string(href)
 			}
 		}
 
@@ -84,5 +109,5 @@ func scrap(urlStr string) []string {
 	}
 	// log.Println("[Scrapper] Links found in "+urlStr+":", len(result))
 
-	return result
+	return canonical, result
 }

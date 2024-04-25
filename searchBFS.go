@@ -125,7 +125,7 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					if next == canonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth+1) {
 						s.ResultPaths = append(s.ResultPaths, newPath)
 						s.ResultDepth = depth + 1
-						continue
+						break
 					}
 
 					s.Queue = append(s.Queue, newPath)

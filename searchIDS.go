@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,7 +11,7 @@ type StateIDS struct {
 	Start        string
 	End          string
 	CanonicalEnd string
-	ResultPath   []string
+	ResultPaths  [][]string
 	Path         []string
 	PathSet      map[string]bool
 	Canonical    map[string]string
@@ -65,10 +66,6 @@ func prefetcherIDS(s *StateIDS) {
 }
 
 func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) {
-	if s.ForceQuit || s.ResultPath != nil {
-		return
-	}
-
 	depth := len(s.Path) - 1
 	current := s.Path[depth]
 
@@ -87,23 +84,16 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 				}
 
 				if current == s.CanonicalEnd {
-					s.ResultPath = s.Path
-
-					s.ForceQuitFetchMutex.Lock()
-					s.ForceQuitFetch = true
-					s.ForceQuitFetchMutex.Unlock()
+					s.ResultPaths = append(s.ResultPaths, s.Path)
 					return
 				}
 
 				for _, next := range pages {
 					if next == s.CanonicalEnd {
-						s.ResultPath = make([]string, len(s.Path))
-						copy(s.ResultPath, s.Path)
-						s.ResultPath = append(s.ResultPath, next)
-
-						s.ForceQuitFetchMutex.Lock()
-						s.ForceQuitFetch = true
-						s.ForceQuitFetchMutex.Unlock()
+						path := make([]string, len(s.Path))
+						copy(path, s.Path)
+						path = append(path, next)
+						s.ResultPaths = append(s.ResultPaths, path)
 						return
 					}
 
@@ -158,7 +148,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 	s := StateIDS{
 		Start:        start,
 		End:          end,
-		ResultPath:   nil,
+		ResultPaths:  make([][]string, 0),
 		Path:         make([]string, 0),
 		PathSet:      make(map[string]bool),
 		Canonical:    make(map[string]string),
@@ -174,7 +164,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 	canonicalEnd, _ := getLinks(end)
 	s.CanonicalEnd = canonicalEnd
 
-	for s.ResultPath == nil {
+	for len(s.ResultPaths) == 0 {
 		s.CurrentFetch = make([]string, 0)
 		for _, nextFetch := range s.NextFetch {
 			if _, found := s.FetchedData[nextFetch]; !found {
@@ -192,8 +182,10 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 		s.MaxDepth += 1
 	}
 
+	log.Println(s.ResultPaths)
+
 	responseChan <- Response{
 		Status:  Finished,
-		Message: strings.Join(s.ResultPath, " ➡️  "),
+		Message: strings.Join(s.ResultPaths[0], " ➡️  "),
 	}
 }

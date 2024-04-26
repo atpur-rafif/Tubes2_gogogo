@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strconv"
 )
 
@@ -31,11 +30,18 @@ func (s *StateBFS) prefetch() {
 	for s.FetchedCount < len(s.Queue) {
 		path := s.Queue[s.FetchedCount]
 		current := path[len(path)-1]
-		// log.Println(s.FetchedCount, len(s.Queue), s.Running, current)
 
 		if _, found := s.FetchedData[current]; !found {
 			if s.Running >= MAX_CONCURRENT {
-				break
+				if s.FetchedCount == 0 {
+					r := <-s.FetchChannel
+					s.Canonical[r.From] = r.Canonical
+					s.FetchedData[r.Canonical] = r.To
+
+					s.Running -= 1
+				} else {
+					break
+				}
 			}
 
 			s.Running += 1
@@ -76,22 +82,17 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	s.Queue = append(s.Queue, []string{start})
 
-	i := 0
 	for {
 		if len(s.Queue) == 0 {
 			break
 		}
 
-		// log.Println("A")
 		s.prefetch()
 		path := s.Queue[0]
 		s.Queue = s.Queue[1:]
 		depth := len(path) - 1
 		current := path[depth]
 		s.FetchedCount -= 1
-
-		log.Println(i, path, len(s.Queue), s.FetchedCount)
-		i += 1
 
 		if s.ResultDepth != -1 && depth > s.ResultDepth {
 			break
@@ -157,7 +158,6 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 				s.FetchedData[r.Canonical] = r.To
 
 				s.Running -= 1
-				// log.Println("A")
 				s.prefetch()
 
 				if current == r.From {

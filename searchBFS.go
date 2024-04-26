@@ -3,122 +3,172 @@ package main
 import (
 	"log"
 	"strconv"
-	"strings"
 )
 
 const MAX_CONCURRENT = 10
 
 type FetchResult struct {
-	From string
-	To   []string
+	From      string
+	Canonical string
+	To        []string
 }
 
 type StateBFS struct {
+	Start        string
+	End          string
+	ResultPaths  [][]string
+	ResultDepth  int
 	Queue        [][]string
-	Visited      map[string]bool
 	FetchedCount int // Optimization to start searching for unfetched data
 	FetchedData  map[string][]string
+	Canonical    map[string]string
 	FetchChannel chan FetchResult
+	Visited      map[string]bool
 	Running      int
 }
 
 func (s *StateBFS) prefetch() {
-	i := s.FetchedCount
-	for i < len(s.Queue) && s.Running < MAX_CONCURRENT {
-		path := s.Queue[i]
+	for s.FetchedCount < len(s.Queue) {
+		path := s.Queue[s.FetchedCount]
 		current := path[len(path)-1]
+		// log.Println(s.FetchedCount, len(s.Queue), s.Running, current)
 
 		if _, found := s.FetchedData[current]; !found {
+			if s.Running >= MAX_CONCURRENT {
+				break
+			}
+
 			s.Running += 1
 			go func() {
+				canonical, pages := getLinks(current)
 				s.FetchChannel <- FetchResult{
-					From: current,
-					To:   getLinks(current),
+					From:      current,
+					To:        pages,
+					Canonical: canonical,
 				}
 			}()
 		}
 		s.FetchedCount += 1
-
-		i += 1
 	}
 }
 
 func SearchBFS(start, end string, responseChan chan Response, forceQuit chan bool) {
 	responseChan <- Response{
-		Status:  Started,
+		Status:  Start,
 		Message: "Started...",
 	}
 
+	canonicalEnd, _ := getLinks(end)
+
 	s := StateBFS{
+		Start:        start,
+		End:          canonicalEnd,
+		ResultPaths:  make([][]string, 0),
 		Queue:        make([][]string, 0),
-		Visited:      make(map[string]bool),
 		FetchedData:  make(map[string][]string),
 		FetchChannel: make(chan FetchResult),
+		Canonical:    make(map[string]string),
+		Visited:      make(map[string]bool),
 		FetchedCount: 0,
 		Running:      0,
+		ResultDepth:  -1,
 	}
 
 	s.Queue = append(s.Queue, []string{start})
-	s.prefetch()
 
-	var resultPath []string
-LO:
+	i := 0
 	for {
 		if len(s.Queue) == 0 {
-			log.Println("Path not found")
 			break
 		}
 
+		// log.Println("A")
+		s.prefetch()
 		path := s.Queue[0]
 		s.Queue = s.Queue[1:]
-		current := path[len(path)-1]
+		depth := len(path) - 1
+		current := path[depth]
 		s.FetchedCount -= 1
+
+		log.Println(i, path, len(s.Queue), s.FetchedCount)
+		i += 1
+
+		if s.ResultDepth != -1 && depth > s.ResultDepth {
+			break
+		}
+
+		if canonical, found := s.Canonical[current]; found {
+			current = canonical
+		}
 		if s.Visited[current] {
 			continue
 		}
+		path[depth] = current
+		s.Visited[current] = true
 
 		for {
 			if _, found := s.FetchedData[current]; found {
+				path[depth] = current
 				s.Visited[current] = true
+
+				responseChan <- Response{
+					Status: Log,
+					Message: "Visited article count: " + strconv.Itoa(len(s.FetchedData)) +
+						"\nDepth: " + strconv.Itoa(depth) +
+						"\nVisited " + current,
+				}
+
+				var result []string = nil
+				if current == canonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth) {
+					result = path
+					s.ResultDepth = depth
+				}
+
+				for _, next := range s.FetchedData[current] {
+					newPath := make([]string, len(path))
+					copy(newPath, path)
+					newPath = append(newPath, next)
+
+					if next == canonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth+1) {
+						result = newPath
+						s.ResultDepth = depth + 1
+						continue
+					}
+
+					s.Queue = append(s.Queue, newPath)
+				}
+
+				if result != nil {
+					s.ResultPaths = append(s.ResultPaths, result)
+					responseChan <- Response{
+						Status:  Found,
+						Message: result,
+					}
+				}
+
 				break
 			}
 
 			select {
 			case <-forceQuit:
 				return
-			case result := <-s.FetchChannel:
-				from := result.From
-				s.FetchedData[from] = result.To
+			case r := <-s.FetchChannel:
+				s.Canonical[r.From] = r.Canonical
+				s.FetchedData[r.Canonical] = r.To
+
 				s.Running -= 1
+				// log.Println("A")
 				s.prefetch()
+
+				if current == r.From {
+					current = r.Canonical
+				}
 			}
 		}
-
-		responseChan <- Response{
-			Status:  Update,
-			Message: "Visited " + current + " with depth " + strconv.Itoa(len(path)-1),
-		}
-
-		for _, to := range s.FetchedData[current] {
-			if s.Visited[to] {
-				continue
-			}
-
-			newPath := make([]string, len(path))
-			copy(newPath, path)
-			newPath = append(newPath, to)
-			s.Queue = append(s.Queue, newPath)
-
-			if end == to {
-				resultPath = newPath
-				break LO
-			}
-		}
-		s.prefetch()
 	}
 
 	responseChan <- Response{
-		Status:  Finished,
-		Message: strings.Join(resultPath, " ➡️  "),
+		Status: End,
+		// Message: strings.Join(resultPath, " ➡️  "),
 	}
 }

@@ -2,6 +2,136 @@ function $(id) {
 	return document.getElementById(id);
 }
 
+const grapher = (function() {
+	const container = $("graph-container")
+	const local = {}
+
+	const svg = d3.create("svg")
+	container.append(svg.node());
+
+	let width;
+	let height;
+	let offsetWidth;
+	let offsetHeight;
+
+	const resize = () => {
+		width = container.clientWidth;
+		height = container.clientHeight;
+		offsetWidth = width / 2;
+		offsetHeight = height / 2;
+
+		svg
+			.attr("width", width)
+			.attr("height", height)
+			.attr("viewBox", [-width / 2, -height / 2, width, height])
+	}
+	resize()
+
+	window.addEventListener("resize", resize)
+
+	const force = d3.forceSimulation()
+		.force("link", d3.forceLink().id(d => d.id).distance(100))
+		.force("charge", d3.forceManyBody().strength(-300))
+		.force("center", d3.forceCenter(0, 0))
+		.force("x",
+			d3.forceX(d => {
+				let value = 0
+				if (d.id == local.start) value = 0.1 * width - offsetWidth;
+				else if (d.id == local.end) value = 0.9 * width - offsetWidth;
+				return value;
+			}).strength(d => {
+				return d.id == local.start || d.id == local.end ? 0.005 : 0
+			})
+		).force("y",
+			d3.forceY(d => {
+				let value = 0
+				if (d.id == local.start) value = 0.1 * height - offsetHeight;
+				else if (d.id == local.end) value = 0.9 * height - offsetHeight;
+				return value;
+			}).strength(d => {
+				return d.id == local.start || d.id == local.end ? 0.005 : 0
+			})
+		);
+	const link = force.force("link")
+
+	local.nodes = force.nodes()
+	local.links = link.links()
+
+	local.nodeGroup = svg.append("g")
+	local.linksGroup = svg.append("g")
+
+	force.on("tick", () => {
+		if (local.linkDOM) local.linkDOM
+			.attr("x1", d => d.source.x)
+			.attr("y1", d => d.source.y)
+			.attr("x2", d => d.target.x)
+			.attr("y2", d => d.target.y);
+
+		if (local.nodeDOM) local.nodeDOM
+			.attr("cx", d => d.x)
+			.attr("cy", d => d.y);
+
+		if (local.textNodeDOM) local.textNodeDOM
+			.attr("transform", d => `translate(${d.x},${d.y - 10})`);
+	});
+
+	this.refreshGraph = () => {
+		force.stop()
+
+		force.nodes(local.nodes)
+		link.links(local.links)
+
+		local.nodeDOM = local.nodeGroup
+			.selectAll("circle")
+			.data(local.nodes)
+			.join("circle")
+			.attr("r", 5)
+			.attr("fill", "white")
+
+		local.textNodeDOM = local.nodeGroup
+			.selectAll("text")
+			.data(local.nodes)
+			.join("text")
+			.attr("r", 5)
+			.attr("fill", "white")
+			.attr("text-anchor", "middle")
+			.attr("opacity", 0.6)
+			.text(d => d.id)
+
+		local.linkDOM = local.linksGroup
+			.attr("stroke", "white")
+			.attr("stroke-opacity", 0.6)
+			.selectAll("line")
+			.data(local.links)
+			.join("line")
+			.attr("stroke-width", 1);
+
+		force.alphaTarget(1).restart();
+	}
+
+	this.addNode = (name) => {
+		if (local.nodes.find(e => e.id == name))
+			return
+		local.nodes.push({ id: name })
+	}
+
+	this.addStartNode = (name) => {
+		local.start = name
+		this.addNode(name)
+	}
+
+	this.addEndNode = (name) => {
+		local.end = name
+		this.addNode(name)
+	}
+
+	this.addLink = (from, to) => {
+		local.links.push({ "source": from, "target": to })
+	}
+
+	return this
+}());
+
 const host = new URL(document.URL).host
 const ws = new WebSocket("ws://" + host + "/api")
 const state = {
@@ -11,22 +141,6 @@ const state = {
 ws.addEventListener("error", (e) => {
 	console.log(e)
 })
-
-function showUpdate(str) {
-	const el = $("update-container")
-	el.classList.add("show")
-	el.insertAdjacentHTML("beforeend", `<p>${str}</p>`)
-	el.scrollTop = el.scrollHeight
-	if (el.childElementCount > 20) {
-		el.firstChild.remove()
-	}
-}
-
-function clearUpdate() {
-	const el = $("update-container")
-	el.classList.remove("show")
-	el.innerHTML = ""
-}
 
 let timerId = 0
 function startTimer() {
@@ -42,27 +156,36 @@ function stopTimer() {
 }
 
 ws.addEventListener("message", (e) => {
-	/** @type {{ status: "error" | "update" | "started" | "finished", message: string}} */
+	/** @type {{ status: "error" | "update" | "started" | "finished", message: any}} */
 	const data = JSON.parse(e.data)
+
 	if (data.status == "error") {
 		alert(data.message)
 		return
 	} else if (data.status == "started") {
 		state.running = true
-		clearUpdate()
-		showUpdate("Started...")
-		startTimer()
 	}
-	else if (data.status == "update") showUpdate(data.message)
+	else if (data.status == "update") {
+		$("log-container").innerHTML = data.message.replaceAll("\n", "<br>")
+	}
+	else if (data.status == "found") {
+		const pages = data.message
+		for (let i = 0; i < pages.length; ++i) {
+			const page = pages[i]
+			if (i == 0) grapher.addStartNode(page)
+			else if (i == pages.length - 1) grapher.addEndNode(page)
+			else grapher.addNode(page)
+			if (i > 0)
+				grapher.addLink(pages[i - 1], page)
+			grapher.refreshGraph()
+		}
+	}
 	else if (data.status == "finished") {
 		state.running = false
-		clearUpdate()
-		showUpdate(data.message)
-		stopTimer()
 	}
 })
 
-$("input-start").value = "Highway"
+$("input-start").value = "Hitler"
 $("input-end").value = "Traffic"
 $("search-button").addEventListener("click", async () => {
 	$("search-button").blur()
@@ -88,85 +211,3 @@ $("search-button").addEventListener("click", async () => {
 		start, end, type, force
 	}))
 })
-
-const grapher = (function() {
-	const width = window.innerWidth;
-	const height = window.innerHeight;
-	const container = $("graph-container")
-
-	const local = {}
-
-	const svg = d3.create("svg")
-		.attr("width", width)
-		.attr("height", height)
-		.attr("viewBox", [-width / 2, -height / 2, width, height])
-	container.append(svg.node());
-
-
-	const link = d3.forceLink().id(d => d.id)
-	const force = d3.forceSimulation()
-		.force("link", link)
-		.force("charge", d3.forceManyBody().strength(-100))
-		.force("center", d3.forceCenter(0, 0))
-		.force("x", d3.forceX())
-		.force("y", d3.forceY());
-
-	local.nodes = force.nodes()
-	local.links = link.links()
-
-	local.nodeGroup = svg.append("g")
-	local.linksGroup = svg.append("g")
-
-	force.on("tick", () => {
-		if (local.linkDOM) local.linkDOM
-			.attr("x1", d => d.source.x)
-			.attr("y1", d => d.source.y)
-			.attr("x2", d => d.target.x)
-			.attr("y2", d => d.target.y);
-
-		if (local.nodeDOM) local.nodeDOM
-			.attr("cx", d => d.x)
-			.attr("cy", d => d.y);
-	});
-
-	this.refreshGraph = () => {
-		force.stop()
-
-		force.nodes(local.nodes)
-		link.links(local.links)
-
-		local.nodeDOM = local.nodeGroup
-			.selectAll("circle")
-			.data(local.nodes)
-			.join("circle")
-			.attr("r", 5)
-			.attr("fill", "white")
-
-		local.linkDOM = local.linksGroup
-			.attr("stroke", "white")
-			.attr("stroke-opacity", 0.6)
-			.selectAll("line")
-			.data(local.links)
-			.join("line")
-			.attr("stroke-width", d => Math.sqrt(d.value));
-
-		force.alphaTarget(0.3).restart();
-	}
-
-	this.addNode = (name) => {
-		local.nodes.push({ id: name })
-	}
-
-	this.addLink = (from, to) => {
-		local.links.push({ "source": from, "target": to })
-	}
-
-	return this
-}());
-
-setTimeout(() => {
-	for (let i = 0; i < 1000; ++i) {
-		grapher.addNode(i)
-	}
-	grapher.refreshGraph()
-}, 1000)

@@ -2,17 +2,17 @@ package main
 
 import (
 	"strconv"
-	"strings"
 	"sync"
 )
 
 type StateIDS struct {
-	Start      string
-	End        string
-	ResultPath []string
-
-	Path    []string
-	Visited map[string]bool
+	Start        string
+	End          string
+	CanonicalEnd string
+	ResultPaths  [][]string
+	Path         []string
+	PathSet      map[string]bool
+	Canonical    map[string]string
 
 	FetchedData  map[string][]string
 	FetchChannel chan FetchResult
@@ -23,7 +23,8 @@ type StateIDS struct {
 	ForceQuitFetch      bool
 	ForceQuitFetchMutex sync.Mutex
 
-	MaxDepth int
+	MaxDepth    int
+	ResultDepth int
 }
 
 func prefetcherIDS(s *StateIDS) {
@@ -45,9 +46,11 @@ func prefetcherIDS(s *StateIDS) {
 
 		running += 1
 		go func() {
+			canon, pages := getLinks(current)
 			s.FetchChannel <- FetchResult{
-				From: current,
-				To:   getLinks(current),
+				From:      current,
+				To:        pages,
+				Canonical: canon,
 			}
 			finishedChan <- true
 		}()
@@ -62,32 +65,53 @@ func prefetcherIDS(s *StateIDS) {
 }
 
 func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) {
-	if s.ForceQuit || s.ResultPath != nil {
-		return
-	}
-
 	depth := len(s.Path) - 1
 	current := s.Path[depth]
+
+	if canonical, found := s.Canonical[current]; found {
+		current = canonical
+	}
 
 	if depth == s.MaxDepth {
 		for {
 			if pages, found := s.FetchedData[current]; found {
+				s.Path[depth] = current
+
 				responseChan <- Response{
-					Status:  Update,
-					Message: "Visited " + current + " with depth " + strconv.Itoa(depth),
+					Status:  Log,
+					Message: "Visited " + current + " with depth " + strconv.Itoa(depth) + " " + strconv.Itoa(len(s.FetchedData)),
 				}
 
-				for _, next := range pages {
-					if next == s.End {
-						s.ResultPath = s.Path
-						s.ResultPath = append(s.ResultPath, next)
+				var result []string = nil
+				if current == s.CanonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth) {
+					result = s.Path
+					s.ResultDepth = depth
+				}
 
-						s.ForceQuitFetchMutex.Lock()
-						s.ForceQuitFetch = true
-						s.ForceQuitFetchMutex.Unlock()
+				if s.ResultDepth == -1 || depth <= s.ResultDepth {
+					for _, next := range pages {
+						if next == s.CanonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth+1) {
+							path := make([]string, len(s.Path))
+							copy(path, s.Path)
+							path = append(path, next)
+
+							result = path
+							s.ResultDepth = depth + 1
+							continue
+						}
+
+						s.NextFetch = append(s.NextFetch, next)
+					}
+				}
+
+				if result != nil {
+					responseChan <- Response{
+						Status:  Found,
+						Message: result,
 					}
 
-					s.NextFetch = append(s.NextFetch, next)
+					s.ResultPaths = append(s.ResultPaths, result)
+					return
 				}
 
 				break
@@ -98,15 +122,29 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 				s.ForceQuit = true
 				return
 			case r := <-s.FetchChannel:
-				s.FetchedData[r.From] = r.To
-			}
+				s.FetchedData[r.Canonical] = r.To
+				s.Canonical[r.From] = r.Canonical
 
+				if r.From == current {
+					current = r.Canonical
+				}
+			}
 		}
 	} else {
 		if pages, found := s.FetchedData[current]; found {
 			for _, next := range pages {
+				if canonical, found := s.Canonical[next]; found {
+					next = canonical
+				}
+
+				if s.PathSet[next] {
+					continue
+				}
+
 				s.Path = append(s.Path, next)
+				s.PathSet[next] = true
 				traverserIDS(s, responseChan, forceQuit)
+				delete(s.PathSet, next)
 				s.Path = s.Path[:len(s.Path)-1]
 			}
 		} else {
@@ -117,27 +155,31 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 
 func SearchIDS(start, end string, responseChan chan Response, forceQuit chan bool) {
 	responseChan <- Response{
-		Status:  Started,
+		Status:  Start,
 		Message: "Started...",
 	}
 
 	s := StateIDS{
 		Start:        start,
 		End:          end,
-		ResultPath:   nil,
+		ResultPaths:  make([][]string, 0),
 		Path:         make([]string, 0),
-		Visited:      make(map[string]bool),
+		PathSet:      make(map[string]bool),
+		Canonical:    make(map[string]string),
 		FetchedData:  make(map[string][]string),
 		FetchChannel: make(chan FetchResult),
 		CurrentFetch: make([]string, 0),
 		NextFetch:    make([]string, 0),
 		MaxDepth:     0,
+		ResultDepth:  -1,
 	}
 
 	s.Path = append(s.Path, s.Start)
 	s.NextFetch = append(s.NextFetch, s.Start)
+	canonicalEnd, _ := getLinks(end)
+	s.CanonicalEnd = canonicalEnd
 
-	for s.ResultPath == nil {
+	for s.ResultDepth == -1 || s.MaxDepth <= s.ResultDepth {
 		s.CurrentFetch = make([]string, 0)
 		for _, nextFetch := range s.NextFetch {
 			if _, found := s.FetchedData[nextFetch]; !found {
@@ -156,7 +198,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 	}
 
 	responseChan <- Response{
-		Status:  Finished,
-		Message: strings.Join(s.ResultPath, " ➡️  "),
+		Status: End,
+		// Message: strings.Join(s.ResultPaths[0], " ➡️  "),
 	}
 }

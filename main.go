@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"encoding/json"
+	// "io/fs"
 	"log"
 	"net/http"
 
@@ -19,20 +20,21 @@ var upgrader = websocket.Upgrader{
 //go:embed static/*
 var static embed.FS
 
-// func main() {
-// 	forceQuit := make(chan bool)
-// 	responses := make(chan Response)
-// 	go func() {
-// 		SearchBFS("Adolf_Hitler", "Traffic", responses, forceQuit)
-// 		// SearchIDS("Highway", "Traffic", responses, forceQuit)
-// 	}()
-// 	for res := range responses {
-// 		// _ = res
-// 		log.Println(res)
-// 	}
-// }
-
 func main() {
+	forceQuit := make(chan bool)
+	responses := make(chan Response)
+	go func() {
+		SearchBFS("Highway", "Traffic", responses, forceQuit)
+		// SearchIDS("Hitler", "Traffic", responses, forceQuit)
+		// SearchIDS("Highway", "Traffic", responses, forceQuit)
+	}()
+	for res := range responses {
+		_ = res
+		// log.Println(res)
+	}
+}
+
+func main_old() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -132,6 +134,7 @@ func main() {
 
 	// content, _ := fs.Sub(static, "static")
 	http.Handle("/", http.FileServer(http.Dir("static")))
+	// http.Handle("/", http.FileServer(http.FS(content)))
 	log.Println("Listening on port 3000")
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {

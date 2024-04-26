@@ -82,7 +82,13 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	s.Queue = append(s.Queue, []string{start})
 
+	// i := 0
 	for {
+		// if i == 100 {
+		// 	break
+		// }
+		// i += 1
+
 		if len(s.Queue) == 0 {
 			break
 		}
@@ -116,6 +122,7 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					Status: Log,
 					Message: "Visited article count: " + strconv.Itoa(len(s.FetchedData)) +
 						"\nDepth: " + strconv.Itoa(depth) +
+						"\nQueue size: " + strconv.Itoa(len(s.Queue)) +
 						"\nVisited " + current,
 				}
 

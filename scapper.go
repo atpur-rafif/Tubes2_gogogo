@@ -29,14 +29,14 @@ func scrap(urlStr string) (string, []string) {
 
 	canonical := ""
 	if err != nil {
-		log.Println("Can't parse URL " + urlStr)
+		log.Println("Scrapper can't parse URL " + urlStr)
 		return canonical, result
 	}
 
 	// log.Println("[Scrapper] Visiting  " + urlStr)
 	response, err := http.Get(urlStr)
 	if err != nil {
-		log.Println("Can't visit URL " + urlStr)
+		log.Println("Scrapper can't visit URL " + urlStr)
 		return canonical, result
 	}
 	defer response.Body.Close()
@@ -93,7 +93,7 @@ func scrap(urlStr string) (string, []string) {
 					str := string(value)
 					to, err := url.Parse(str)
 					if err != nil {
-						log.Println("Can't parse URL " + str)
+						log.Println("Scrapper can't parse URL " + str)
 						continue
 					}
 					absTo := toAbsUrl(from, to)

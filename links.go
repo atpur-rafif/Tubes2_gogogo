@@ -76,15 +76,23 @@ func createCachePath(str string) string {
 }
 
 func readCache(page string) (string, []string, bool) {
+	time.Sleep(100 * time.Millisecond)
+
 	pagePath := createCachePath(page)
 	if !fileExist(pagePath) {
 		return "", nil, false
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	cacheByte, _ := os.ReadFile(pagePath)
+	cacheByte, err := os.ReadFile(pagePath)
 	cache := string(cacheByte)
+	if err != nil {
+		return "", nil, false
+	}
+
+	if len(cache) == 0 {
+		os.Remove(pagePath)
+		return "", nil, false
+	}
 
 	if cache[0] != '\n' {
 		return page, strings.Split(cache, "\n"), true
@@ -92,7 +100,15 @@ func readCache(page string) (string, []string, bool) {
 
 	canon := strings.Replace(cache, "\n", "", 1)
 	canonPath := createCachePath(canon)
-	cacheCanonByte, _ := os.ReadFile(canonPath)
+	if !fileExist(canonPath) {
+		return "", nil, false
+	}
+
+	cacheCanonByte, err := os.ReadFile(canonPath)
+	if err != nil {
+		return "", nil, false
+	}
+
 	cacheCanon := string(cacheCanonByte)
 	return canon, strings.Split(cacheCanon, "\n"), true
 }
@@ -142,18 +158,22 @@ func getLinks(page string) (string, Pages) {
 	//
 	// return canon, P[page]
 
-	canon, pages, ok := readCache(page)
-	if ok {
-		return canon, pages
-	}
+	var canon string
+	var pages []string
 
-	canonURL, pageURL := scrap(WIKI + page)
-	pages = filterPages(pageURL)
-	canon, ok = parsePage(canonURL)
-	if !ok {
+	// canon, pages, ok := readCache(page)
+	// if ok {
+	// 	return canon, pages
+	// }
+
+	canonURL, pagesURL := scrap(WIKI + url.PathEscape(page))
+	pages = filterPages(pagesURL)
+	canon, parseOk := parsePage(canonURL)
+	if !parseOk {
 		canon = page
 	}
 
-	writeCache(page, canon, pages)
+	// writeCache(page, canon, pages)
+
 	return canon, pages
 }

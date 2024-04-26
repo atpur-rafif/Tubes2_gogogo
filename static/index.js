@@ -3,10 +3,17 @@ function $(id) {
 }
 
 const grapher = (function() {
-	const container = $("graph-container")
 	const local = {}
+	const container = $("graph-container")
+
+	const zoom = d3.zoom()
+		.on('zoom', e => {
+			d3.selectAll('g')
+				.attr('transform', e.transform)
+		})
 
 	const svg = d3.create("svg")
+		.call(zoom)
 	container.append(svg.node());
 
 	let width;
@@ -17,8 +24,8 @@ const grapher = (function() {
 	const resize = () => {
 		width = container.clientWidth;
 		height = container.clientHeight;
-		offsetWidth = width / 2;
-		offsetHeight = height / 2;
+		offsetWidth = -width / 2;
+		offsetHeight = -height / 2;
 
 		svg
 			.attr("width", width)
@@ -36,20 +43,20 @@ const grapher = (function() {
 		.force("x",
 			d3.forceX(d => {
 				let value = 0
-				if (d.id == local.start) value = 0.1 * width - offsetWidth;
-				else if (d.id == local.end) value = 0.9 * width - offsetWidth;
+				if (d.id == local.start) value = 0.1 * width + offsetWidth;
+				else if (d.id == local.end) value = 0.9 * width + offsetWidth;
 				return value;
 			}).strength(d => {
-				return d.id == local.start || d.id == local.end ? 0.005 : 0
+				return d.id == local.start || d.id == local.end ? 0.1 : 0
 			})
 		).force("y",
 			d3.forceY(d => {
 				let value = 0
-				if (d.id == local.start) value = 0.1 * height - offsetHeight;
-				else if (d.id == local.end) value = 0.9 * height - offsetHeight;
+				if (d.id == local.start) value = 0.1 * height + offsetHeight;
+				else if (d.id == local.end) value = 0.9 * height + offsetHeight;
 				return value;
 			}).strength(d => {
-				return d.id == local.start || d.id == local.end ? 0.005 : 0
+				return d.id == local.start || d.id == local.end ? 0.1 : 0
 			})
 		);
 	const link = force.force("link")
@@ -57,8 +64,10 @@ const grapher = (function() {
 	local.nodes = force.nodes()
 	local.links = link.links()
 
-	local.nodeGroup = svg.append("g")
 	local.linksGroup = svg.append("g")
+	local.textNodeGroup = svg.append("g")
+	local.nodeGroup = svg.append("g")
+		.attr("cursor", "pointer")
 
 	force.on("tick", () => {
 		if (local.linkDOM) local.linkDOM
@@ -75,7 +84,7 @@ const grapher = (function() {
 			.attr("transform", d => `translate(${d.x},${d.y - 10})`);
 	});
 
-	this.refreshGraph = () => {
+	const refreshGraph = () => {
 		force.stop()
 
 		force.nodes(local.nodes)
@@ -85,17 +94,31 @@ const grapher = (function() {
 			.selectAll("circle")
 			.data(local.nodes)
 			.join("circle")
-			.attr("r", 5)
+			.attr("r", 7)
 			.attr("fill", "white")
+			.attr("opacity", d => {
+				if (local.selected == null) return 0.9
+				return d.id == local.selected ? 1 : 0.5
+			})
+			.on("mouseover", function() {
+				local.selected = this.__data__.id
+				refreshGraph()
+			})
+			.on("mouseout", function() {
+				local.selected = null
+				refreshGraph()
+			})
 
-		local.textNodeDOM = local.nodeGroup
+		local.textNodeDOM = local.textNodeGroup
 			.selectAll("text")
 			.data(local.nodes)
 			.join("text")
-			.attr("r", 5)
 			.attr("fill", "white")
 			.attr("text-anchor", "middle")
-			.attr("opacity", 0.6)
+			.attr("opacity", d => {
+				if (local.selected == null) return 0.6
+				return d.id == local.selected ? 1 : 0.1
+			})
 			.text(d => d.id)
 
 		local.linkDOM = local.linksGroup
@@ -106,8 +129,25 @@ const grapher = (function() {
 			.join("line")
 			.attr("stroke-width", 1);
 
+		local.nodeDOM.call(d3.drag()
+			.on("start", (e) => {
+				if (!e.active) force.alphaTarget(0.3).restart();
+				e.subject.fx = e.subject.x;
+				e.subject.fy = e.subject.y;
+			})
+			.on("drag", (e) => {
+				e.subject.fx = e.x;
+				e.subject.fy = e.y;
+			})
+			.on("end", (e) => {
+				if (!e.active) force.alphaTarget(0);
+				e.subject.fx = null;
+				e.subject.fy = null;
+			}));
+
 		force.alphaTarget(1).restart();
 	}
+	this.refreshGraph = refreshGraph
 
 	this.addNode = (name) => {
 		if (local.nodes.find(e => e.id == name))
@@ -116,13 +156,25 @@ const grapher = (function() {
 	}
 
 	this.addStartNode = (name) => {
+		if (local.nodes.find(e => e.id == name))
+			return
 		local.start = name
-		this.addNode(name)
+		local.nodes.push({
+			id: name,
+			x: 0.1 * width + offsetWidth,
+			y: 0.1 * height + offsetHeight
+		})
 	}
 
 	this.addEndNode = (name) => {
+		if (local.nodes.find(e => e.id == name))
+			return
 		local.end = name
-		this.addNode(name)
+		local.nodes.push({
+			id: name,
+			x: 0.9 * width + offsetWidth,
+			y: 0.9 * height + offsetHeight
+		})
 	}
 
 	this.addLink = (from, to) => {
@@ -185,7 +237,7 @@ ws.addEventListener("message", (e) => {
 	}
 })
 
-$("input-start").value = "Hitler"
+$("input-start").value = "Highway"
 $("input-end").value = "Traffic"
 $("search-button").addEventListener("click", async () => {
 	$("search-button").blur()
@@ -211,3 +263,7 @@ $("search-button").addEventListener("click", async () => {
 		start, end, type, force
 	}))
 })
+
+// setTimeout(() => {
+// 	$("search-button").click()
+// }, 100)

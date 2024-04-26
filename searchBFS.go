@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 )
 
 const MAX_CONCURRENT = 10
@@ -123,7 +124,8 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					Message: "Visited article count: " + strconv.Itoa(len(s.FetchedData)) +
 						"\nDepth: " + strconv.Itoa(depth) +
 						"\nQueue size: " + strconv.Itoa(len(s.Queue)) +
-						"\nVisited " + current,
+						"\nVisited " + current +
+						"\nPath: " + strings.Join(path, " - "),
 				}
 
 				var result []string = nil

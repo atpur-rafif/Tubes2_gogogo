@@ -178,6 +178,8 @@ const grapher = (function() {
 	}
 
 	this.addLink = (from, to) => {
+		if (local.links.find(v => v.source.id == from && v.target.id == to))
+			return
 		local.links.push({ "source": from, "target": to })
 	}
 

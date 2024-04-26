@@ -199,9 +199,10 @@ ws.addEventListener("error", (e) => {
 let timerId = 0
 function startTimer() {
 	$("time-taken").innerText = "0.0"
+	const start = performance.now()
 	timerId = setInterval(() => {
-		const from = $("time-taken").innerText
-		$("time-taken").innerText = (parseFloat(from) + 0.1).toFixed(1)
+		const now = performance.now()
+		$("time-taken").innerText = ((now - start) / 1e3).toFixed(1)
 	}, 100)
 }
 
@@ -218,6 +219,7 @@ ws.addEventListener("message", (e) => {
 		return
 	} else if (data.status == "started") {
 		state.running = true
+		startTimer()
 	}
 	else if (data.status == "update") {
 		$("log-container").innerHTML = data.message.replaceAll("\n", "<br>")
@@ -236,6 +238,7 @@ ws.addEventListener("message", (e) => {
 	}
 	else if (data.status == "finished") {
 		state.running = false
+		stopTimer()
 	}
 })
 

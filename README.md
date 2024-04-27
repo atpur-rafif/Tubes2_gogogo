@@ -15,7 +15,7 @@ Sementara, algoritma IDS merupakan pengembangan dari DFS, sehingga menggunakan t
 # Running
 1. Clone repository
    ```
-   https://github.com/atpur-rafif/Tubes2_gogogo.git
+   git clone https://github.com/atpur-rafif/Tubes2_gogogo.git
    ```
 2. Pindah direktori
    ```

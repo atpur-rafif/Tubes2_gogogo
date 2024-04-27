@@ -25,6 +25,10 @@ Sementara, algoritma IDS merupakan pengembangan dari DFS, sehingga menggunakan t
    ```
    go run .
    ```
+   atau jika menggunakan docker
+   ```
+   docker compose up
+   ```
 4. Buka Peramban
 5. Masukkan tautan
    ```
@@ -33,7 +37,7 @@ Sementara, algoritma IDS merupakan pengembangan dari DFS, sehingga menggunakan t
 6. Masukkan laman awal dan laman akhir, untuk laman dengan judul memiliki spasi gunakan _
 7. Pilih metode pencarian BFS atau IDS
 8. Klik tombol _search_
-   
+
 # Author
 Group name: gogogo
 

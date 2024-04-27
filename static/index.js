@@ -2,6 +2,13 @@ function $(id) {
 	return document.getElementById(id);
 }
 
+$("input-start").value = "Medan Prijaji"
+$("input-end").value = "Hitler"
+
+// setTimeout(() => {
+// 	$("search-button").click()
+// }, 100)
+
 const grapher = (function() {
 	const local = {}
 	const container = $("graph-container")
@@ -183,32 +190,86 @@ const grapher = (function() {
 		local.links.push({ "source": from, "target": to })
 	}
 
+	this.reset = () => {
+		local.links = []
+		local.nodes = []
+		refreshGraph()
+	}
+
 	return this
 }());
 
-const host = new URL(document.URL).host
-const ws = new WebSocket("ws://" + host + "/api")
 const state = {
 	running: false,
+	timerId: 0
 }
 
-ws.addEventListener("error", (e) => {
-	console.log(e)
-})
-
-let timerId = 0
 function startTimer() {
 	$("time-taken").innerText = "0.0"
 	const start = performance.now()
-	timerId = setInterval(() => {
+	state.timerId = setInterval(() => {
 		const now = performance.now()
 		$("time-taken").innerText = ((now - start) / 1e3).toFixed(1)
 	}, 100)
 }
 
 function stopTimer() {
-	clearInterval(timerId)
+	clearInterval(state.timerId)
 }
+
+function domOnStart() {
+	startTimer()
+	$("search-button").innerText = "Stop"
+	$("input-start").disabled = $("input-end").disabled = $("input-method").disabled = true
+	grapher.reset()
+}
+
+function domOnFinish() {
+	stopTimer()
+	$("search-button").innerText = "Start"
+	$("input-start").disabled = $("input-end").disabled = $("input-method").disabled = false
+}
+
+function changeLog(str) {
+	$("log-container").innerHTML = str.replaceAll("\n", "<br>")
+}
+
+const searchButton = $("search-button")
+searchButton.addEventListener("click", async () => {
+	searchButton.blur()
+
+	if (state.running) {
+		if (!confirm("Program still running, cancel search?")) return
+
+		state.running = false
+		domOnFinish()
+		changeLog("Search stopped")
+		ws.send(JSON.stringify({
+			cancel: true
+		}))
+	} else {
+		const start = $("input-start").value
+		const end = $("input-end").value
+		const type = $("input-method").value
+
+		if (start == "" || end == "") {
+			alert("Input still empty!")
+			return
+		}
+
+		domOnStart()
+		ws.send(JSON.stringify({
+			start, end, type
+		}))
+	}
+})
+
+const host = new URL(document.URL).host
+const ws = new WebSocket("ws://" + host + "/api")
+
+ws.addEventListener("error", (e) => {
+	console.log(e)
+})
 
 ws.addEventListener("message", (e) => {
 	/** @type {{ status: "error" | "update" | "started" | "finished", message: any}} */
@@ -219,12 +280,9 @@ ws.addEventListener("message", (e) => {
 		return
 	} else if (data.status == "started") {
 		state.running = true
-		startTimer()
-	}
-	else if (data.status == "update") {
-		$("log-container").innerHTML = data.message.replaceAll("\n", "<br>")
-	}
-	else if (data.status == "found") {
+	} else if (data.status == "update") {
+		changeLog(data.message)
+	} else if (data.status == "found") {
 		const pages = data.message
 		for (let i = 0; i < pages.length; ++i) {
 			const page = pages[i]
@@ -238,37 +296,10 @@ ws.addEventListener("message", (e) => {
 	}
 	else if (data.status == "finished") {
 		state.running = false
-		stopTimer()
+		domOnFinish()
 	}
 })
 
-$("input-start").value = "Highway"
-$("input-end").value = "Traffic"
-$("search-button").addEventListener("click", async () => {
-	$("search-button").blur()
-	let force = false
-	if (state.running) {
-		if (!confirm("Program still running, cancel and search the new one?")) {
-			return
-		}
-		force = true
-		stopTimer()
-	}
 
-	const start = $("input-start").value
-	const end = $("input-end").value
-	const type = $("input-method").value
 
-	if (start == "" || end == "") {
-		alert("Input still empty!")
-		return
-	}
 
-	ws.send(JSON.stringify({
-		start, end, type, force
-	}))
-})
-
-// setTimeout(() => {
-// 	$("search-button").click()
-// }, 100)

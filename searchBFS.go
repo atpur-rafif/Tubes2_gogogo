@@ -85,7 +85,7 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	// i := 0
 	for {
-		// if i == 100 {
+		// if i == 1000 {
 		// 	break
 		// }
 		// i += 1

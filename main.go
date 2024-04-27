@@ -44,20 +44,25 @@ func main() {
 
 		write := make(chan Response)
 		read := make(chan Request)
-		forceQuit := make(chan bool)
+		wsQuit := make(chan bool)
 
 		go func(conn *websocket.Conn) {
 			for {
 				msgType, msg, err := conn.ReadMessage()
 				if err != nil {
 					log.Println(err)
-					forceQuit <- true
+					wsQuit <- true
 					break
 				}
 
 				if msgType == websocket.TextMessage {
 					var request Request
 					json.Unmarshal(msg, &request)
+
+					if request.Cancel {
+						read <- request
+						continue
+					}
 
 					if len(request.Start) == 0 || len(request.End) == 0 {
 						write <- Response{
@@ -83,7 +88,7 @@ func main() {
 		go func(conn *websocket.Conn) {
 			for {
 				select {
-				case <-forceQuit:
+				case <-wsQuit:
 					break
 				case msg := <-write:
 					conn.WriteJSON(msg)
@@ -93,26 +98,26 @@ func main() {
 
 		running := false
 		finished := make(chan bool)
-		forceQuitRun := make(chan bool)
+		runQuit := make(chan bool)
 		for {
 			select {
 			case <-finished:
 				running = false
-			case <-forceQuit:
+			case <-wsQuit:
 				log.Println("End")
-				forceQuitRun <- true
+				runQuit <- true
 				break
 			case req := <-read:
 				if running {
-					if req.Force {
-						forceQuitRun <- true
+					if req.Cancel {
+						runQuit <- true
 					} else {
 						write <- Response{
 							Status:  Error,
 							Message: "Program still running",
 						}
-						continue
 					}
+					continue
 				}
 
 				running = true
@@ -125,7 +130,7 @@ func main() {
 					} else {
 						log.Panic("Invalid method")
 					}
-					fn(req.Start, req.End, write, forceQuitRun)
+					fn(req.Start, req.End, write, runQuit)
 					finished <- true
 				}()
 			}

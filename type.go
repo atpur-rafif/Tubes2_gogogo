@@ -30,10 +30,10 @@ const (
 type Status uint8
 
 type Request struct {
-	Start string
-	End   string
-	Force bool
-	Type  string
+	Start  string
+	End    string
+	Type   string
+	Cancel bool
 }
 
 type Response struct {

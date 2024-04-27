@@ -131,9 +131,11 @@ const grapher = (function() {
 		}
 
 		infoDom.innerHTML = ""
-		if (local.selected == local.selectionPriority[2]) infoDom.insertAdjacentHTML("beforeend", "🔒 ")
-		infoDom.insertAdjacentHTML("beforeend", `${local.pathDepth[local.selected]} ${local.selected} (${paths.length}):<br>`)
-		infoDom.insertAdjacentHTML("beforeend", paths.map((v, i) => `${i + 1}. ${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
+		let header = ""
+		if (local.selected == local.selectionPriority[2]) header += "🔒 "
+		header += `${local.pathDepth[local.selected]} ${local.selected} (${paths.length}):`
+		infoDom.insertAdjacentHTML("beforeend", `<p>${header}</p>`)
+		infoDom.insertAdjacentHTML("beforeend", paths.map((v, i) => `<p>${i + 1}. ${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s</p>`).join(""))
 	}
 
 	const setSelection = (select, priority) => {

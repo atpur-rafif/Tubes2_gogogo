@@ -45,11 +45,17 @@ body {
 	padding: 0.5rem;
 	max-height: 50%;
 	max-width: 30%;
-	overflow: scroll;
+	overflow: auto;
 	border-style: solid;
 	border-color: white;
 	border-width: 0 0.1rem 0.1rem 0;
+	direction: rtl;
 }
+
+#graph-info-container p {
+	direction: ltr;
+}
+
 
 #result-container {
 	color: white;

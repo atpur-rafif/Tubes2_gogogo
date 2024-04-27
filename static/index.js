@@ -133,7 +133,7 @@ const grapher = (function() {
 		infoDom.innerHTML = ""
 		let header = ""
 		if (local.selected == local.selectionPriority[2]) header += "🔒 "
-		header += `${local.pathDepth[local.selected]} ${local.selected} (${paths.length}):`
+		header += `${local.pathDepth[local.selected]} <a href="https://en.wikipedia.org/wiki/${local.selected}">${local.selected}</a> (${paths.length}):`
 		infoDom.insertAdjacentHTML("beforeend", `<p>${header}</p>`)
 		infoDom.insertAdjacentHTML("beforeend", paths.map((v, i) => `<p>${i + 1}. ${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s</p>`).join(""))
 	}

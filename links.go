@@ -25,26 +25,33 @@ func parsePage(to string) (string, bool) {
 		return "", false
 	}
 
-	if // Namespace
-	strings.HasPrefix(rel, "User:") ||
-		strings.HasPrefix(rel, "Wikipedia:") ||
-		strings.HasPrefix(rel, "File:") ||
-		strings.HasPrefix(rel, "MediaWiki:") ||
-		strings.HasPrefix(rel, "Template:") ||
-		strings.HasPrefix(rel, "Help:") ||
-		strings.HasPrefix(rel, "Category:") ||
-		strings.HasPrefix(rel, "Portal:") ||
-		strings.HasPrefix(rel, "Draft:") ||
-		strings.HasPrefix(rel, "TimedText:") ||
-		strings.HasPrefix(rel, "Module:") ||
-
-		// Former namespace
-		strings.HasPrefix(rel, "Book:") ||
-		strings.HasPrefix(rel, "Course:") ||
-		strings.HasPrefix(rel, "Institution:") ||
-		strings.HasPrefix(rel, "Topic:") {
+	if strings.Contains(rel, ":") {
 		return "", false
 	}
+
+	// if strings.HasPrefix(rel, "Talk:") ||
+	// 	// Namespace
+	// 	strings.HasPrefix(rel, "User:") ||
+	// 	strings.HasPrefix(rel, "Wikipedia:") ||
+	// 	strings.HasPrefix(rel, "File:") ||
+	// 	strings.HasPrefix(rel, "MediaWiki:") ||
+	// 	strings.HasPrefix(rel, "Template:") ||
+	// 	strings.HasPrefix(rel, "Help:") ||
+	// 	strings.HasPrefix(rel, "Category:") ||
+	// 	strings.HasPrefix(rel, "Portal:") ||
+	// 	strings.HasPrefix(rel, "Draft:") ||
+	// 	strings.HasPrefix(rel, "TimedText:") ||
+	// 	strings.HasPrefix(rel, "Module:") ||
+	// 	// Virtual namespace
+	// 	strings.HasPrefix(rel, "Special:") ||
+	// 	strings.HasPrefix(rel, "Media:") ||
+	// 	// Former namespace
+	// 	strings.HasPrefix(rel, "Book:") ||
+	// 	strings.HasPrefix(rel, "Course:") ||
+	// 	strings.HasPrefix(rel, "Institution:") ||
+	// 	strings.HasPrefix(rel, "Topic:") {
+	// 	return "", false
+	// }
 
 	page, err := url.QueryUnescape(rel)
 	if err != nil {

@@ -14,7 +14,11 @@ const grapher = (function() {
 		path: [],
 		relatedLink: {},
 		relatedNode: {},
-		relatedPathAndTime: {}
+		relatedPathAndTime: {},
+		start: null,
+		end: null,
+		selected: null,
+		selectionPriority: {}
 	}
 	const container = $("graph-container")
 
@@ -26,6 +30,9 @@ const grapher = (function() {
 
 	const svg = d3.create("svg")
 		.call(zoom)
+		.on("click", function() {
+			clearSelection(2)
+		})
 	container.append(svg.node());
 
 	let width;
@@ -96,6 +103,39 @@ const grapher = (function() {
 			.attr("transform", d => `translate(${d.x},${d.y - 10})`);
 	});
 
+	const refreshSelectionPriority = () => {
+		let max = -1;
+		Object.entries(local.selectionPriority).forEach(([k, v]) => {
+			const vk = parseInt(k)
+			if (vk > max) {
+				max = vk
+				local.selected = v
+			}
+		})
+		if (max == -1) local.selected = null
+	}
+
+	const setSelection = (select, priority) => {
+		local.selectionPriority[priority] = select
+		refreshSelectionPriority();
+
+		const paths = local.relatedPathAndTime[local.selected]
+		$("graph-info-container").innerHTML = ""
+		$("graph-info-container").insertAdjacentHTML("beforeend", `${local.selected} (${paths.length}):<br>`)
+		$("graph-info-container").insertAdjacentHTML("beforeend", paths.map(v => `${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
+		refreshGraph()
+	}
+
+	const clearSelection = (priority) => {
+		delete local.selectionPriority[priority]
+		refreshSelectionPriority();
+
+		if (local.selected == null) {
+			$("graph-info-container").innerHTML = ""
+			refreshGraph()
+		}
+	}
+
 	const refreshGraph = () => {
 		force.stop()
 
@@ -107,7 +147,7 @@ const grapher = (function() {
 			.data(local.nodes)
 			.join("circle")
 			.attr("r", 7)
-			.attr("fill", "white")
+			.attr("fill", d => d.id == local.selectionPriority[2] ? "lightblue" : "white")
 			.attr("opacity", d => {
 				const id = d.id
 				if (local.selected != null) {
@@ -117,18 +157,36 @@ const grapher = (function() {
 				}
 				return 0.9
 			})
-			.on("mouseover", function() {
-				local.selected = this.__data__.id
-				const paths = local.relatedPathAndTime[local.selected]
-				$("graph-info-container").insertAdjacentHTML("beforeend", `${local.selected} (${paths.length}):<br>`)
-				$("graph-info-container").insertAdjacentHTML("beforeend", paths.map(v => `${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
+			.on("click", function(e) {
+				const id = this.__data__.id
+				if (local.selectionPriority[2] == id) clearSelection(2)
+				else setSelection(this.__data__.id, 2)
+				e.stopPropagation()
 				refreshGraph()
 			})
-			.on("mouseout", function() {
-				local.selected = null
-				$("graph-info-container").innerHTML = ""
-				refreshGraph()
+			.on("pointerover", function() {
+				setSelection(this.__data__.id, 0)
 			})
+			.on("pointerout", function() {
+				clearSelection(0)
+			})
+			.call(d3.drag()
+				.on("start", function(e) {
+					setSelection(this.__data__.id, 1)
+					if (!e.active) force.alphaTarget(0.3).restart();
+					e.subject.fx = e.subject.x;
+					e.subject.fy = e.subject.y;
+				})
+				.on("drag", function(e) {
+					e.subject.fx = e.x;
+					e.subject.fy = e.y;
+				})
+				.on("end", function(e) {
+					clearSelection(1)
+					if (!e.active) force.alphaTarget(0);
+					e.subject.fx = null;
+					e.subject.fy = null;
+				}));
 
 		local.textNodeDOM = local.textNodeGroup
 			.selectAll("text")
@@ -162,22 +220,6 @@ const grapher = (function() {
 			})
 			.attr("stroke-width", 1);
 
-		local.nodeDOM.call(d3.drag()
-			.on("start", (e) => {
-				if (!e.active) force.alphaTarget(0.3).restart();
-				e.subject.fx = e.subject.x;
-				e.subject.fy = e.subject.y;
-			})
-			.on("drag", (e) => {
-				e.subject.fx = e.x;
-				e.subject.fy = e.y;
-			})
-			.on("end", (e) => {
-				if (!e.active) force.alphaTarget(0);
-				e.subject.fx = null;
-				e.subject.fy = null;
-			}));
-
 		force.alphaTarget(1).restart();
 	}
 	this.refreshGraph = refreshGraph
@@ -191,6 +233,7 @@ const grapher = (function() {
 		local.relatedPathAndTime = {}
 		local.start = null
 		local.end = null
+		local.selected = null
 		refreshGraph()
 	}
 

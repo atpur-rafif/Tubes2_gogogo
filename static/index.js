@@ -392,6 +392,10 @@ ws.addEventListener("error", (e) => {
 	console.log(e)
 })
 
+ws.addEventListener("close", () => {
+	alert("Disconnected with server")
+})
+
 ws.addEventListener("message", (e) => {
 	/** @type {{ status: "error" | "update" | "started" | "finished", message: any}} */
 	const data = JSON.parse(e.data)
@@ -413,7 +417,3 @@ ws.addEventListener("message", (e) => {
 		domOnFinish()
 	}
 })
-
-
-
-

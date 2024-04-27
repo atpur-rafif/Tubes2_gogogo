@@ -25,7 +25,24 @@ func parsePage(to string) (string, bool) {
 		return "", false
 	}
 
-	if strings.ContainsAny(rel, ":#") {
+	if // Namespace
+	strings.HasPrefix(rel, "User:") ||
+		strings.HasPrefix(rel, "Wikipedia:") ||
+		strings.HasPrefix(rel, "File:") ||
+		strings.HasPrefix(rel, "MediaWiki:") ||
+		strings.HasPrefix(rel, "Template:") ||
+		strings.HasPrefix(rel, "Help:") ||
+		strings.HasPrefix(rel, "Category:") ||
+		strings.HasPrefix(rel, "Portal:") ||
+		strings.HasPrefix(rel, "Draft:") ||
+		strings.HasPrefix(rel, "TimedText:") ||
+		strings.HasPrefix(rel, "Module:") ||
+
+		// Former namespace
+		strings.HasPrefix(rel, "Book:") ||
+		strings.HasPrefix(rel, "Course:") ||
+		strings.HasPrefix(rel, "Institution:") ||
+		strings.HasPrefix(rel, "Topic:") {
 		return "", false
 	}
 
@@ -134,30 +151,6 @@ func writeCache(page, canon string, pages []string) {
 }
 
 func getLinks(page string) (string, Pages) {
-	// time.Sleep(300 * time.Millisecond)
-	// P := make(map[string][]string)
-	// P["Adolf_Hitler"] = []string{"B_"}
-	// P["Hitler"] = []string{"B_"}
-	// P["B"] = []string{"C", "Hitler", "D"}
-	// P["B_"] = []string{"C", "Hitler", "D"}
-	// P["C"] = []string{"D", "B_"}
-	// P["D"] = []string{"E", "B", "F"}
-	// P["E"] = []string{"Traffic"}
-	// P["F"] = []string{"Traffic"}
-	//
-	// canon := page
-	// if page == "Hitler" {
-	// 	canon = "Adolf_Hitler"
-	// }
-	// if page == "Traffic_" {
-	// 	canon = "Traffic"
-	// }
-	// if page == "B_" {
-	// 	canon = "B"
-	// }
-	//
-	// return canon, P[page]
-
 	var canon string
 	var pages []string
 

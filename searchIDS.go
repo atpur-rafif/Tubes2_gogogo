@@ -66,6 +66,10 @@ func prefetcherIDS(s *StateIDS) {
 }
 
 func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) {
+	if s.ForceQuit {
+		return
+	}
+
 	depth := len(s.Path) - 1
 	current := s.Path[depth]
 
@@ -131,6 +135,9 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 			select {
 			case <-forceQuit:
 				s.ForceQuit = true
+				s.ForceQuitFetchMutex.Lock()
+				s.ForceQuitFetch = true
+				s.ForceQuitFetchMutex.Unlock()
 				return
 			case r := <-s.FetchChannel:
 				s.FetchedData[r.Canonical] = r.To

@@ -34,6 +34,15 @@ func main_old() {
 	// }
 }
 
+func check200Status(page string) bool {
+	req, err := http.Get(WIKI + page)
+	if err != nil {
+		return false
+	}
+	defer req.Body.Close()
+	return req.StatusCode == 200
+}
+
 func main() {
 	http.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -76,6 +85,14 @@ func main() {
 						write <- Response{
 							Status:  Error,
 							Message: "Invalid method",
+						}
+						continue
+					}
+
+					if !(check200Status(request.Start) && check200Status(request.End)) {
+						write <- Response{
+							Status:  Error,
+							Message: "Page not found",
 						}
 						continue
 					}

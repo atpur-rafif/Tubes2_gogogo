@@ -339,14 +339,12 @@ function stopTimer() {
 }
 
 function domOnStart() {
-	startTimer()
 	$("search-button").innerText = "Stop"
 	$("input-start").disabled = $("input-end").disabled = $("input-method").disabled = true
 	grapher.reset()
 }
 
 function domOnFinish() {
-	stopTimer()
 	$("search-button").innerText = "Start"
 	$("input-start").disabled = $("input-end").disabled = $("input-method").disabled = false
 }
@@ -364,7 +362,9 @@ searchButton.addEventListener("click", async () => {
 
 		state.running = false
 		domOnFinish()
-		changeLog("Search stopped")
+		stopTimer()
+		$("time-taken").innerText = "0.0"
+		changeLog(`Search stopped at ${getTime() / 1e3}s`)
 		ws.send(JSON.stringify({
 			cancel: true
 		}))
@@ -402,10 +402,12 @@ ws.addEventListener("message", (e) => {
 
 	if (data.status == "error") {
 		alert(data.message)
-		return
+		changeLog("Error searching")
+		domOnFinish()
 	} else if (data.status == "started") {
 		state.running = true
 		changeLog(data.message)
+		startTimer()
 	} else if (data.status == "update") {
 		changeLog(data.message)
 	} else if (data.status == "found") {
@@ -415,5 +417,6 @@ ws.addEventListener("message", (e) => {
 		state.running = false
 		changeLog(data.message)
 		domOnFinish()
+		stopTimer()
 	}
 })

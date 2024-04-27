@@ -159,7 +159,7 @@ const grapher = (function() {
 			.selectAll("circle")
 			.data(local.nodes)
 			.join("circle")
-			.attr("r", d => d.id == local.selectionPriority[2] ? 10 : 7)
+			.attr("r", d => d.id == local.selectionPriority[2] ? 9 : 7)
 			.attr("fill", d => d.id == local.selectionPriority[2] ? "white" : colors(local.pathDepth[d.id]))
 			.attr("opacity", d => {
 				const id = d.id
@@ -358,7 +358,7 @@ searchButton.addEventListener("click", async () => {
 	searchButton.blur()
 
 	if (state.running) {
-		if (!confirm("Program still running, cancel search?")) return
+		if (!confirm("Program still running, stop searching?")) return
 
 		state.running = false
 		domOnFinish()

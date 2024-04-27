@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -77,9 +78,19 @@ func traverserIDS(s *StateIDS, responseChan chan Response, forceQuit chan bool) 
 			if pages, found := s.FetchedData[current]; found {
 				s.Path[depth] = current
 
+				statusLog := ""
+				if s.ResultDepth == depth {
+					statusLog = "\nValidating " + current
+				} else {
+					statusLog = "\nTraversed: " + strings.Join(s.Path, " - ")
+				}
+
 				responseChan <- Response{
-					Status:  Log,
-					Message: "Visited " + current + " with depth " + strconv.Itoa(depth) + " " + strconv.Itoa(len(s.FetchedData)),
+					Status: Log,
+					Message: "Visited article count: " + strconv.Itoa(len(s.FetchedData)) +
+						"\nIteration: " + strconv.Itoa(s.MaxDepth) +
+						"\nDepth: " + strconv.Itoa(depth) +
+						statusLog,
 				}
 
 				var result []string = nil
@@ -198,7 +209,7 @@ func SearchIDS(start, end string, responseChan chan Response, forceQuit chan boo
 	}
 
 	responseChan <- Response{
-		Status: End,
-		// Message: strings.Join(s.ResultPaths[0], " ➡️  "),
+		Status:  End,
+		Message: "Search finished",
 	}
 }

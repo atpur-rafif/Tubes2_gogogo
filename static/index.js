@@ -120,9 +120,12 @@ const grapher = (function() {
 		refreshSelectionPriority();
 
 		const paths = local.relatedPathAndTime[local.selected]
-		$("graph-info-container").innerHTML = ""
-		$("graph-info-container").insertAdjacentHTML("beforeend", `${local.selected} (${paths.length}):<br>`)
-		$("graph-info-container").insertAdjacentHTML("beforeend", paths.map(v => `${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
+		const infoDom = $("graph-info-container")
+
+		infoDom.innerHTML = ""
+		if (priority == 2) infoDom.insertAdjacentHTML("beforeend", "🔒 ")
+		infoDom.insertAdjacentHTML("beforeend", `${local.selected} (${paths.length}):<br>`)
+		infoDom.insertAdjacentHTML("beforeend", paths.map(v => `${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
 		refreshGraph()
 	}
 

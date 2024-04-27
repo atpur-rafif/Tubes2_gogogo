@@ -399,14 +399,15 @@ ws.addEventListener("message", (e) => {
 		return
 	} else if (data.status == "started") {
 		state.running = true
+		changeLog(data.message)
 	} else if (data.status == "update") {
 		changeLog(data.message)
 	} else if (data.status == "found") {
 		grapher.addPath(data.message, getTime())
 		grapher.refreshGraph()
-	}
-	else if (data.status == "finished") {
+	} else if (data.status == "finished") {
 		state.running = false
+		changeLog(data.message)
 		domOnFinish()
 	}
 })

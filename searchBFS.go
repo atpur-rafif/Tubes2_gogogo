@@ -83,13 +83,7 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	s.Queue = append(s.Queue, []string{start})
 
-	// i := 0
 	for {
-		// if i == 100 {
-		// 	break
-		// }
-		// i += 1
-
 		if len(s.Queue) == 0 {
 			break
 		}
@@ -119,13 +113,18 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 				path[depth] = current
 				s.Visited[current] = true
 
+				statusLog := ""
+				if s.ResultDepth == depth {
+					statusLog = "\nValidating " + current
+				} else {
+					statusLog = "\nTraversed: " + strings.Join(path, " - ")
+				}
+
 				responseChan <- Response{
 					Status: Log,
 					Message: "Visited article count: " + strconv.Itoa(len(s.FetchedData)) +
 						"\nDepth: " + strconv.Itoa(depth) +
-						"\nQueue size: " + strconv.Itoa(len(s.Queue)) +
-						"\nVisited " + current +
-						"\nPath: " + strings.Join(path, " - "),
+						statusLog,
 				}
 
 				var result []string = nil
@@ -133,6 +132,8 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					result = path
 					s.ResultDepth = depth
 				}
+
+				newPaths := make([][]string, 0)
 
 				for _, next := range s.FetchedData[current] {
 					newPath := make([]string, len(path))
@@ -142,10 +143,10 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					if next == canonicalEnd && (s.ResultDepth == -1 || s.ResultDepth == depth+1) {
 						result = newPath
 						s.ResultDepth = depth + 1
-						continue
+						break
 					}
 
-					s.Queue = append(s.Queue, newPath)
+					newPaths = append(newPaths, newPath)
 				}
 
 				if result != nil {
@@ -153,6 +154,10 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 					responseChan <- Response{
 						Status:  Found,
 						Message: result,
+					}
+				} else {
+					for _, newPath := range newPaths {
+						s.Queue = append(s.Queue, newPath)
 					}
 				}
 
@@ -177,7 +182,7 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 	}
 
 	responseChan <- Response{
-		Status: End,
-		// Message: strings.Join(resultPath, " ➡️  "),
+		Status:  End,
+		Message: "Search finished",
 	}
 }

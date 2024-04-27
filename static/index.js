@@ -2,15 +2,19 @@ function $(id) {
 	return document.getElementById(id);
 }
 
-$("input-start").value = "Medan Prijaji"
-$("input-end").value = "Hitler"
+$("input-start").value = "Highway"
+$("input-end").value = "Traffic"
 
 // setTimeout(() => {
 // 	$("search-button").click()
 // }, 100)
 
 const grapher = (function() {
-	const local = {}
+	const local = {
+		path: [],
+		relatedLink: {},
+		relatedNode: {}
+	}
 	const container = $("graph-container")
 
 	const zoom = d3.zoom()
@@ -104,8 +108,13 @@ const grapher = (function() {
 			.attr("r", 7)
 			.attr("fill", "white")
 			.attr("opacity", d => {
-				if (local.selected == null) return 0.9
-				return d.id == local.selected ? 1 : 0.5
+				const id = d.id
+				if (local.selected != null) {
+					if (id == local.selected) return 1
+					if (local.relatedNode[local.selected][id]) return 0.6
+					return 0.2
+				}
+				return 0.9
 			})
 			.on("mouseover", function() {
 				local.selected = this.__data__.id
@@ -123,17 +132,29 @@ const grapher = (function() {
 			.attr("fill", "white")
 			.attr("text-anchor", "middle")
 			.attr("opacity", d => {
-				if (local.selected == null) return 0.6
-				return d.id == local.selected ? 1 : 0.1
+				const id = d.id
+				if (local.selected != null) {
+					if (id == local.selected) return 1
+					if (local.relatedNode[local.selected][id]) return 0.4
+					return 0.1
+				}
+				return 0.6
 			})
 			.text(d => d.id)
 
 		local.linkDOM = local.linksGroup
 			.attr("stroke", "white")
-			.attr("stroke-opacity", 0.6)
 			.selectAll("line")
 			.data(local.links)
 			.join("line")
+			.attr("stroke-opacity", d => {
+				if (local.selected != null) {
+					const key = d.source.id + "-" + d.target.id
+					if (local.relatedLink[local.selected][key]) return 0.8
+					return 0.1
+				}
+				return 0.6
+			})
 			.attr("stroke-width", 1);
 
 		local.nodeDOM.call(d3.drag()
@@ -156,44 +177,68 @@ const grapher = (function() {
 	}
 	this.refreshGraph = refreshGraph
 
-	this.addNode = (name) => {
-		if (local.nodes.find(e => e.id == name))
-			return
-		local.nodes.push({ id: name })
-	}
-
-	this.addStartNode = (name) => {
-		if (local.nodes.find(e => e.id == name))
-			return
-		local.start = name
-		local.nodes.push({
-			id: name,
-			x: 0.1 * width + offsetWidth,
-			y: 0.1 * height + offsetHeight
-		})
-	}
-
-	this.addEndNode = (name) => {
-		if (local.nodes.find(e => e.id == name))
-			return
-		local.end = name
-		local.nodes.push({
-			id: name,
-			x: 0.9 * width + offsetWidth,
-			y: 0.9 * height + offsetHeight
-		})
-	}
-
-	this.addLink = (from, to) => {
-		if (local.links.find(v => v.source.id == from && v.target.id == to))
-			return
-		local.links.push({ "source": from, "target": to })
-	}
-
 	this.reset = () => {
 		local.links = []
 		local.nodes = []
+		local.path = []
+		local.relatedLink = {}
+		local.start = null
+		local.end = null
 		refreshGraph()
+	}
+
+	this.addPath = (path) => {
+		if (local.start == null || local.end == null) {
+			local.start = path[0]
+			local.end = path[path.length - 1]
+		} else {
+			if (local.start != path[0] || local.end != path[path.length - 1])
+				throw "Mismatch start and endpoints with existing path, reset graph to use another endpoints"
+		}
+
+		const relatedLink = {}
+		for (let i = 0; i < path.length; ++i) {
+			const page = path[i]
+
+			if (!local.nodes.find(e => e.id == page)) {
+				if (i == 0) local.nodes.push({
+					id: page,
+					x: 0.1 * width + offsetWidth,
+					y: 0.1 * height + offsetHeight
+				})
+				else if (i == path.length - 1) local.nodes.push({
+					id: page,
+					x: 0.9 * width + offsetWidth,
+					y: 0.9 * height + offsetHeight
+				})
+				else local.nodes.push({
+					id: page,
+				})
+			}
+
+			if (!local.relatedNode[page])
+				local.relatedNode[page] = {}
+			for (const node of path)
+				local.relatedNode[page][node] = true
+
+			if (i == 0) continue
+
+			const from = path[i - 1]
+			const to = path[i]
+
+			if (!relatedLink)
+				relatedLink = {}
+			relatedLink[from + "-" + to] = true
+
+			if (!local.links.find(v => v.source.id == from && v.target.id == to))
+				local.links.push({ "source": from, "target": to })
+		}
+
+		for (const node of path) {
+			if (!local.relatedLink[node])
+				local.relatedLink[node] = {}
+			Object.assign(local.relatedLink[node], relatedLink)
+		}
 	}
 
 	return this
@@ -283,16 +328,8 @@ ws.addEventListener("message", (e) => {
 	} else if (data.status == "update") {
 		changeLog(data.message)
 	} else if (data.status == "found") {
-		const pages = data.message
-		for (let i = 0; i < pages.length; ++i) {
-			const page = pages[i]
-			if (i == 0) grapher.addStartNode(page)
-			else if (i == pages.length - 1) grapher.addEndNode(page)
-			else grapher.addNode(page)
-			if (i > 0)
-				grapher.addLink(pages[i - 1], page)
-			grapher.refreshGraph()
-		}
+		grapher.addPath(data.message)
+		grapher.refreshGraph()
 	}
 	else if (data.status == "finished") {
 		state.running = false

@@ -83,12 +83,12 @@ func SearchBFS(start, end string, responseChan chan Response, forceQuit chan boo
 
 	s.Queue = append(s.Queue, []string{start})
 
-	i := 0
+	// i := 0
 	for {
-		if i == 100 {
-			break
-		}
-		i += 1
+		// if i == 100 {
+		// 	break
+		// }
+		// i += 1
 
 		if len(s.Queue) == 0 {
 			break

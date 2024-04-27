@@ -2,12 +2,12 @@ function $(id) {
 	return document.getElementById(id);
 }
 
-$("input-start").value = "Highway"
-$("input-end").value = "Traffic"
+$("input-start").value = "Medan Prijaji"
+$("input-end").value = "Hitler"
 
-setTimeout(() => {
-	$("search-button").click()
-}, 100)
+// setTimeout(() => {
+// 	$("search-button").click()
+// }, 100)
 
 const grapher = (function() {
 	const local = {
@@ -15,6 +15,7 @@ const grapher = (function() {
 		relatedLink: {},
 		relatedNode: {},
 		relatedPathAndTime: {},
+		pathDepth: {},
 		start: null,
 		end: null,
 		selected: null,
@@ -54,6 +55,11 @@ const grapher = (function() {
 	resize()
 
 	window.addEventListener("resize", resize)
+
+	// Too lazy to choose color https://stackoverflow.com/a/41849519
+	const colors = d3.scaleLinear()
+		.range(["#5E4FA2", "#3288BD", "#66C2A5", "#ABDDA4", "#E6F598",
+			"#FFFFBF", "#FEE08B", "#FDAE61", "#F46D43", "#D53E4F", "#9E0142"]);
 
 	const force = d3.forceSimulation()
 		.force("link", d3.forceLink().id(d => d.id).distance(100))
@@ -115,32 +121,36 @@ const grapher = (function() {
 		if (max == -1) local.selected = null
 	}
 
-	const setSelection = (select, priority) => {
-		local.selectionPriority[priority] = select
-		refreshSelectionPriority();
-
+	const refreshSelection = () => {
 		const paths = local.relatedPathAndTime[local.selected]
 		const infoDom = $("graph-info-container")
 
+		if (local.selected == null) {
+			$("graph-info-container").innerHTML = ""
+			return
+		}
+
 		infoDom.innerHTML = ""
-		if (priority == 2) infoDom.insertAdjacentHTML("beforeend", "🔒 ")
-		infoDom.insertAdjacentHTML("beforeend", `${local.selected} (${paths.length}):<br>`)
-		infoDom.insertAdjacentHTML("beforeend", paths.map(v => `${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
+		if (local.selected == local.selectionPriority[2]) infoDom.insertAdjacentHTML("beforeend", "🔒 ")
+		infoDom.insertAdjacentHTML("beforeend", `${local.pathDepth[local.selected]} ${local.selected} (${paths.length}):<br>`)
+		infoDom.insertAdjacentHTML("beforeend", paths.map((v, i) => `${i + 1}. ${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
+	}
+
+	const setSelection = (select, priority) => {
+		local.selectionPriority[priority] = select
+		refreshSelectionPriority();
 		refreshGraph()
 	}
 
 	const clearSelection = (priority) => {
 		delete local.selectionPriority[priority]
 		refreshSelectionPriority();
-
-		if (local.selected == null) {
-			$("graph-info-container").innerHTML = ""
-			refreshGraph()
-		}
+		refreshGraph()
 	}
 
 	const refreshGraph = () => {
 		force.stop()
+		refreshSelection()
 
 		force.nodes(local.nodes)
 		link.links(local.links)
@@ -149,8 +159,8 @@ const grapher = (function() {
 			.selectAll("circle")
 			.data(local.nodes)
 			.join("circle")
-			.attr("r", 7)
-			.attr("fill", d => d.id == local.selectionPriority[2] ? "lightblue" : "white")
+			.attr("r", d => d.id == local.selectionPriority[2] ? 10 : 7)
+			.attr("fill", d => d.id == local.selectionPriority[2] ? "white" : colors(local.pathDepth[d.id]))
 			.attr("opacity", d => {
 				const id = d.id
 				if (local.selected != null) {
@@ -244,6 +254,7 @@ const grapher = (function() {
 		if (local.start == null || local.end == null) {
 			local.start = path[0]
 			local.end = path[path.length - 1]
+			colors.domain(d3.range(path.length))
 		} else {
 			if (local.start != path[0] || local.end != path[path.length - 1])
 				throw "Mismatch start and endpoints with existing path, reset graph to use another endpoints"
@@ -259,19 +270,18 @@ const grapher = (function() {
 			local.relatedPathAndTime[page].push(pathAndTime)
 
 			if (!local.nodes.find(e => e.id == page)) {
-				if (i == 0) local.nodes.push({
-					id: page,
+				const newNode = { id: page }
+				if (i == 0) Object.assign(newNode, {
 					x: 0.1 * width + offsetWidth,
-					y: 0.1 * height + offsetHeight
+					y: 0.1 * height + offsetHeight,
 				})
-				else if (i == path.length - 1) local.nodes.push({
+				else if (i == path.length - 1) Object.assign(newNode, {
 					id: page,
 					x: 0.9 * width + offsetWidth,
-					y: 0.9 * height + offsetHeight
+					y: 0.9 * height + offsetHeight,
 				})
-				else local.nodes.push({
-					id: page,
-				})
+				local.nodes.push(newNode)
+				local.pathDepth[page] = i
 			}
 
 			if (!local.relatedNode[page])

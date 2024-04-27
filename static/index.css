@@ -51,6 +51,18 @@ body {
 	flex-grow: 1;
 	overflow: hidden;
 	width: 100%;
+	position: relative;
+}
+
+#graph-info-container {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	background-color: rgba(0, 0, 0, 0.5);
+	border-radius: 0 0 1rem 0;
+	color: white;
+	padding: 1rem;
+	pointer-events: none;
 }
 
 #result-container {

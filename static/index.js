@@ -5,15 +5,16 @@ function $(id) {
 $("input-start").value = "Highway"
 $("input-end").value = "Traffic"
 
-// setTimeout(() => {
-// 	$("search-button").click()
-// }, 100)
+setTimeout(() => {
+	$("search-button").click()
+}, 100)
 
 const grapher = (function() {
 	const local = {
 		path: [],
 		relatedLink: {},
-		relatedNode: {}
+		relatedNode: {},
+		relatedPathAndTime: {}
 	}
 	const container = $("graph-container")
 
@@ -118,10 +119,14 @@ const grapher = (function() {
 			})
 			.on("mouseover", function() {
 				local.selected = this.__data__.id
+				const paths = local.relatedPathAndTime[local.selected]
+				$("graph-info-container").insertAdjacentHTML("beforeend", `${local.selected} (${paths.length}):<br>`)
+				$("graph-info-container").insertAdjacentHTML("beforeend", paths.map(v => `${v[0].join(" ➡️ ")} @ ${(v[1] / 1e3).toFixed(3)}s`).join("<br>"))
 				refreshGraph()
 			})
 			.on("mouseout", function() {
 				local.selected = null
+				$("graph-info-container").innerHTML = ""
 				refreshGraph()
 			})
 
@@ -182,12 +187,14 @@ const grapher = (function() {
 		local.nodes = []
 		local.path = []
 		local.relatedLink = {}
+		local.relatedNode = {}
+		local.relatedPathAndTime = {}
 		local.start = null
 		local.end = null
 		refreshGraph()
 	}
 
-	this.addPath = (path) => {
+	this.addPath = (path, time) => {
 		if (local.start == null || local.end == null) {
 			local.start = path[0]
 			local.end = path[path.length - 1]
@@ -196,9 +203,14 @@ const grapher = (function() {
 				throw "Mismatch start and endpoints with existing path, reset graph to use another endpoints"
 		}
 
+		const pathAndTime = [path, time]
 		const relatedLink = {}
 		for (let i = 0; i < path.length; ++i) {
 			const page = path[i]
+
+			if (!local.relatedPathAndTime[page])
+				local.relatedPathAndTime[page] = []
+			local.relatedPathAndTime[page].push(pathAndTime)
 
 			if (!local.nodes.find(e => e.id == page)) {
 				if (i == 0) local.nodes.push({
@@ -246,16 +258,22 @@ const grapher = (function() {
 
 const state = {
 	running: false,
-	timerId: 0
+	timerId: 0,
+	start: 0
 }
 
 function startTimer() {
 	$("time-taken").innerText = "0.0"
-	const start = performance.now()
+	state.start = performance.now()
 	state.timerId = setInterval(() => {
 		const now = performance.now()
-		$("time-taken").innerText = ((now - start) / 1e3).toFixed(1)
+		$("time-taken").innerText = ((now - state.start) / 1e3).toFixed(1)
 	}, 100)
+}
+
+function getTime() {
+	const now = performance.now()
+	return now - state.start;
 }
 
 function stopTimer() {
@@ -328,7 +346,7 @@ ws.addEventListener("message", (e) => {
 	} else if (data.status == "update") {
 		changeLog(data.message)
 	} else if (data.status == "found") {
-		grapher.addPath(data.message)
+		grapher.addPath(data.message, getTime())
 		grapher.refreshGraph()
 	}
 	else if (data.status == "finished") {

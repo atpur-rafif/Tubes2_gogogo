@@ -161,10 +161,10 @@ func getLinks(page string) (string, Pages) {
 	var canon string
 	var pages []string
 
-	// canon, pages, ok := readCache(page)
-	// if ok {
-	// 	return canon, pages
-	// }
+	canon, pages, ok := readCache(page)
+	if ok {
+		return canon, pages
+	}
 
 	canonURL, pagesURL := scrap(WIKI + url.PathEscape(page))
 	pages = filterPages(pagesURL)
@@ -173,7 +173,7 @@ func getLinks(page string) (string, Pages) {
 		canon = page
 	}
 
-	// writeCache(page, canon, pages)
+	writeCache(page, canon, pages)
 
 	return canon, pages
 }
